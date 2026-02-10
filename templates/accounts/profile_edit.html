@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Редагування профілю{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/profile.css' %}">
+{% endblock %}
+
+{% block header_title %}Редагування профілю{% endblock %}
+
+{% block content %}
+<div class="profile profile--edit">
+    <div class="profile__header">
+        <img src="{{ profile.avatar_url }}" alt="Аватар" class="profile__avatar">
+        <div>
+            <div class="profile__name">{{ request.user.username }}</div>
+            <div class="profile__meta">@{{ request.user.username }}</div>
+        </div>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" class="profile__form">
+        {% csrf_token %}
+
+        <div class="profile__field">
+            <label class="profile__label" for="id_bio">Про себе</label>
+            {{ form.bio }}
+        </div>
+
+        <div class="profile__field">
+            <label class="profile__label" for="id_avatar">Аватар</label>
+            {{ form.avatar }}
+        </div>
+
+        <div class="profile__field">
+            <label class="profile__label" for="id_cover_image">Обкладинка</label>
+            {{ form.cover_image }}
+        </div>
+
+        <div class="profile__actions">
+            <a href="{% url 'accounts:profile' %}" class="profile__button profile__button--ghost">Скасувати</a>
+            <button type="submit" class="profile__button">Зберегти</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

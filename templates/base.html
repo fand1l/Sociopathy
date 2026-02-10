@@ -1,0 +1,128 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{% static 'css/base.css' %}">
+    <link href="https://cdn.boxicons.com/3.0.8/fonts/basic/boxicons.min.css" rel="stylesheet">
+    {% block extra_head %}{% endblock %}
+    <title>{% block title %}Sociopathy{% endblock %}</title>
+</head>
+<body class="site">
+    <aside class="site__sidebar">
+        <div class="sidebar__inner">
+            <div class="sidebar__logo">
+                <a href="{% url 'posts:home' %}">
+                    <img src="{% static 'assets/logo.svg' %}" alt="Sociopathy Logo" class="logo-img">
+                </a>
+            </div>
+
+            <nav class="sidebar__menu menu">
+                <ul class="menu__list">
+                    <li class="menu__item">
+                        <a href="{% url 'posts:home' %}" class="menu__link {% if request.resolver_match.view_name == 'posts:home' %}menu__link--active{% endif %}">
+                            <i class="bx bx-home-alt-2"></i>
+                        </a>
+                    </li>
+                    <li class="menu__item">
+                        <a href="#" class="menu__link">
+                            <i class="bx bx-compass"></i>
+                        </a>
+                    </li>
+                    <li class="menu__item new_post">
+                        <a href="#" class="menu__link">
+                            <i class="bx bx-plus"></i>
+                        </a>
+                    </li>
+                    <li class="menu__item">
+                        <a href="#" class="menu__link">
+                            <i class="bx bx-bookmark"></i>
+                        </a>
+                    </li>
+                    <li class="menu__item">
+                        {% if user.is_authenticated %}
+                            <a href="{% url 'accounts:profile' %}" class="menu__link {% if request.resolver_match.view_name == 'accounts:profile' %}menu__link--active{% endif %}">
+                                <i class="bx bx-user"></i>
+                            </a>
+                        {% else %}
+                            <a href="{% url 'accounts:login' %}" class="menu__link">
+                                <i class="bx bx-user"></i>
+                            </a>
+                        {% endif %}
+                    </li>
+                </ul>
+            </nav>
+
+            <div class="sidebar__settings">
+                {% if user.is_authenticated %}
+                    <button type="button" class="menu__link logout-trigger" title="Вийти" aria-label="Вийти">
+                        <i class="bx bx-user-minus"></i>
+                    </button>
+                {% else %}
+                    <a href="{% url 'accounts:login' %}" class="menu__link" title="Увійти">
+                        <i class="bx bx-user"></i>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </aside>
+
+    <main class="site__main"> <header class="site__header">
+            <h1 class="header__title">{% block header_title %}Головна{% endblock %}</h1>
+        </header>
+
+        <section class="site__content">
+            {% block content %}{% endblock %}
+        </section>
+    </main>
+
+    {% if user.is_authenticated %}
+    <div class="confirm-modal" id="logoutModal" aria-hidden="true">
+        <div class="confirm-modal__content" role="dialog" aria-modal="true" aria-labelledby="logoutTitle">
+            <div class="confirm-modal__header">
+                <h3 id="logoutTitle">Підтвердити вихід</h3>
+                <button type="button" class="confirm-modal__close" aria-label="Закрити">
+                    <i class="bx bx-x"></i>
+                </button>
+            </div>
+            <p class="confirm-modal__text">Ви точно хочете вийти з акаунта?</p>
+            <form method="POST" action="{% url 'accounts:logout' %}">
+                {% csrf_token %}
+                <div class="confirm-modal__actions">
+                    <button type="button" class="confirm-modal__cancel">Скасувати</button>
+                    <button type="submit" class="confirm-modal__confirm">Вийти</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const modal = document.getElementById('logoutModal');
+            const trigger = document.querySelector('.logout-trigger');
+            if (!modal || !trigger) return;
+
+            const closeButtons = modal.querySelectorAll('.confirm-modal__close, .confirm-modal__cancel');
+
+            const openModal = () => {
+                modal.classList.add('confirm-modal--open');
+                modal.setAttribute('aria-hidden', 'false');
+            };
+
+            const closeModal = () => {
+                modal.classList.remove('confirm-modal--open');
+                modal.setAttribute('aria-hidden', 'true');
+            };
+
+            trigger.addEventListener('click', openModal);
+            closeButtons.forEach((btn) => btn.addEventListener('click', closeModal));
+            modal.addEventListener('click', (event) => {
+                if (event.target === modal) closeModal();
+            });
+        });
+    </script>
+</body>
+</html>

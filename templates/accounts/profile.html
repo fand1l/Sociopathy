@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Мій профіль{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/profile.css' %}">
+{% endblock %}
+
+{% block header_title %}Профіль{% endblock %}
+
+{% block content %}
+<div class="profile">
+    <div class="profile__cover">
+        {% if profile.cover_url %}
+            <img src="{{ profile.cover_url }}" alt="Обкладинка" class="profile__cover-image">
+        {% else %}
+            <div class="profile__cover-placeholder">Обкладинка 970×250</div>
+        {% endif %}
+    </div>
+    <div class="profile__header">
+        <img src="{{ profile.avatar_url }}" alt="Аватар" class="profile__avatar">
+        <div>
+            <div class="profile__name">{{ profile.user.username }}</div>
+            <div class="profile__meta">@{{ profile.user.username }} · {{ profile.user.date_joined|date:"d M Y" }}</div>
+        </div>
+    </div>
+
+    <div class="profile__bio">
+        {% if profile.bio %}
+            {{ profile.bio }}
+        {% else %}
+            Тут поки що порожньо. Додайте кілька слів про себе.
+        {% endif %}
+    </div>
+
+    <div class="profile__stats">
+        <div class="profile__stat">
+            <span>{{ profile.followers.count }}</span>
+            <small>Підписників</small>
+        </div>
+        <div class="profile__stat">
+            <span>{{ profile.following.count }}</span>
+            <small>Підписок</small>
+        </div>
+    </div>
+
+    <div class="profile__actions">
+        {% if is_owner %}
+            <a href="{% url 'accounts:profile_edit' %}" class="profile__button profile__button--ghost">Редагувати профіль</a>
+        {% else %}
+            <form method="POST" action="{% url 'relationships:follow_toggle' profile.user.username %}">
+                {% csrf_token %}
+                <button type="submit" class="profile__button profile__button--ghost profile__button--follow">
+                    {% if follow_state == 'friends' %}
+                        Друзі
+                    {% elif follow_state == 'mutual' %}
+                        Взаємно слідкувати
+                    {% elif follow_state == 'following' %}
+                        Слідкую
+                    {% else %}
+                        Слідкувати
+                    {% endif %}
+                </button>
+            </form>
+        {% endif %}
+        <a href="{% url 'posts:home' %}" class="profile__button">На стрічку</a>
+    </div>
+</div>
+{% endblock %}

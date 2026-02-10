@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Вхід{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/auth.css' %}">
+{% endblock %}
+
+{% block header_title %}Вхід{% endblock %}
+
+{% block content %}
+<div class="auth">
+    <h2 class="auth__title">Ласкаво просимо</h2>
+    <p class="auth__subtitle">Увійдіть у свій акаунт</p>
+
+    {% if form.errors %}
+        <div class="auth__errors">
+            {{ form.non_field_errors }}
+            {% for field in form %}
+                {% for error in field.errors %}
+                    <div>{{ error }}</div>
+                {% endfor %}
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form method="POST">
+        {% csrf_token %}
+        <div class="auth__field">
+            <label class="auth__label" for="id_username">Нікнейм</label>
+            {{ form.username }}
+        </div>
+
+        <div class="auth__field">
+            <label class="auth__label" for="id_password">Пароль</label>
+            {{ form.password }}
+        </div>
+
+        <div class="auth__actions">
+            <a class="auth__link" href="{% url 'accounts:register' %}">Створити акаунт</a>
+            <button type="submit" class="auth__button">Увійти</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
