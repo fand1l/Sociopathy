@@ -51,7 +51,7 @@
                             <img src="{{ post.author.profile.avatar_url }}" alt="{{ post.author.username }}" class="user-avatar user-avatar--small">
                         </div>
                         <div class="user-info">
-                            <a href="#" class="user-info__name">
+                            <a href="{% url 'accounts:profile_detail' post.author.username %}" class="user-info__name">
                                 {{ post.author.username }}
                             </a>
                             <span class="user-info__date">{{ post.created_at|date:"d M H:i" }}</span>
@@ -83,8 +83,8 @@
                             <span>{{ post.likes.count }}</span>
                         </button>
                     </form>
-                    <button class="action-btn">
-                        <i class='bx bx-comment'></i>
+                    <button type="button" class="action-btn">
+                        <i class="bx bx-message-circle"></i>
                         <span>0</span>
                     </button>
                 </div>

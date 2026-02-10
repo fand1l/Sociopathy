@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Реєстрація{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/auth.css' %}">
+{% endblock %}
+
+{% block header_title %}Реєстрація{% endblock %}
+
+{% block content %}
+<div class="auth">
+    <h2 class="auth__title">Створи акаунт</h2>
+    <p class="auth__subtitle">Вигадай нікнейм та пароль</p>
+
+    {% if form.errors %}
+        <div class="auth__errors">
+            {{ form.non_field_errors }}
+            {% for field in form %}
+                {% for error in field.errors %}
+                    <div>{{ error }}</div>
+                {% endfor %}
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form method="POST" id="registerForm" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="auth__field">
+            <label class="auth__label" for="id_username">Нікнейм</label>
+            {{ form.username }}
+            <div id="usernameStatus" class="auth__status"></div>
+        </div>
+
+        <div class="auth__field">
+            <label class="auth__label" for="id_password1">Пароль</label>
+            {{ form.password1 }}
+        </div>
+
+        <div class="auth__field">
+            <label class="auth__label" for="id_password2">Повторіть пароль</label>
+            {{ form.password2 }}
+        </div>
+
+        <div class="auth__field">
+            <label class="auth__label" for="id_avatar">Аватар</label>
+            {{ form.avatar }}
+            <small class="auth__hint">PNG/JPG, до 2–4MB</small>
+        </div>
+
+        <div class="auth__field">
+            <label class="auth__label" for="id_cover_image">Обкладинка</label>
+            {{ form.cover_image }}
+            <small class="auth__hint">Горизонтальне фото для профілю</small>
+        </div>
+
+        <div class="auth__actions">
+            <a class="auth__link" href="{% url 'accounts:login' %}">Вже є акаунт?</a>
+            <button type="submit" class="auth__button">Зареєструватися</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    const usernameInput = document.getElementById('id_username');
+    const usernameStatus = document.getElementById('usernameStatus');
+    const registerForm = document.getElementById('registerForm');
+    let debounceTimer;
+
+    const setStatus = (available, message) => {
+        usernameStatus.textContent = message || '';
+        usernameStatus.classList.remove('auth__status--success', 'auth__status--error');
+        usernameInput.classList.remove('is-valid', 'is-invalid');
+
+        if (!message) {
+            return;
+        }
+
+        if (available) {
+            usernameStatus.classList.add('auth__status--success');
+            usernameInput.classList.add('is-valid');
+        } else {
+            usernameStatus.classList.add('auth__status--error');
+            usernameInput.classList.add('is-invalid');
+        }
+    };
+
+    const checkUsername = async (value) => {
+        if (!value) {
+            setStatus(false, '');
+            return;
+        }
+
+        try {
+            const response = await fetch(`{% url 'accounts:username_check' %}?username=${encodeURIComponent(value)}`);
+            if (!response.ok) {
+                setStatus(false, 'Помилка перевірки');
+                return;
+            }
+            const data = await response.json();
+            setStatus(data.available, data.message);
+        } catch (error) {
+            setStatus(false, 'Помилка мережі');
+        }
+    };
+
+    usernameInput.addEventListener('input', (event) => {
+        const value = event.target.value.trim();
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => checkUsername(value), 300);
+    });
+
+    registerForm.addEventListener('submit', (event) => {
+        if (usernameInput.classList.contains('is-invalid')) {
+            event.preventDefault();
+            usernameInput.focus();
+        }
+    });
+</script>
+{% endblock %}

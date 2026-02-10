@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Видалення поста{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/feed.css' %}">
+<style>
+    .modal { display: block; }
+    .modal__content { margin-top: 8%; }
+    .modal__footer { display: flex; justify-content: flex-end; gap: 10px; }
+    .modal__danger {
+        background-color: #ff4b4b;
+        color: #111;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 20px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    .modal__cancel {
+        color: var(--inactive-color);
+        text-decoration: none;
+        align-self: center;
+        font-size: 0.95rem;
+    }
+    .modal__text {
+        color: #e0e0e0;
+        margin-bottom: 20px;
+        line-height: 1.5;
+    }
+</style>
+{% endblock %}
+
+{% block header_title %}Видалення поста{% endblock %}
+
+{% block content %}
+<div class="feed-container">
+    <div class="modal">
+        <div class="modal__content">
+            <div class="modal__header">
+                <h3>Видалити пост?</h3>
+                <a href="{% url 'posts:home' %}" class="modal__close"><i class="bx bx-x"></i></a>
+            </div>
+            <p class="modal__text">Ви впевнені, що хочете видалити цей пост? Дію не можна буде скасувати.</p>
+            <form method="POST">
+                {% csrf_token %}
+                <div class="modal__footer">
+                    <a href="{% url 'posts:home' %}" class="modal__cancel">Скасувати</a>
+                    <button type="submit" class="modal__danger">Видалити</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
