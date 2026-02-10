@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Головна{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/feed.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="feed-container">
+    <div class="feed__trigger" id="feedTrigger">
+        <div class="trigger__avatar">
+            {% if user.is_authenticated %}
+                <img src="{{ user.profile.avatar_url }}" alt="My Avatar" class="user-avatar">
+            {% else %}
+                <div class="avatar-stub"></div> 
+            {% endif %}
+        </div>
+        <div class="trigger__input">Що у вас на думці?</div>
+    </div>
+
+    <div id="postModal" class="modal">
+        <div class="modal__content">
+            <div class="modal__header">
+                <h3>Новий пост</h3>
+                <span class="modal__close"><i class="bx bx-x"></i></span>
+            </div>
+            <form method="POST" action="{% url 'posts:home' %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                {{ form.content }}
+                
+                <div class="modal__upload">
+                    <label for="file-upload" class="custom-file-upload">
+                        <i class="bx bx-image-add"></i> Додати фото
+                    </label>
+                    {{ form.image }}
+                </div>
+
+                <div class="modal__footer">
+                    <button type="submit" class="modal__button">Опублікувати</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="posts-list">
+        {% for post in posts %}
+            <article class="post-card">
+                <div class="post-card__header">
+                    <div class="post-card__user">
+                        <div class="avatar-wrapper">
+                            <img src="{{ post.author.profile.avatar_url }}" alt="{{ post.author.username }}" class="user-avatar user-avatar--small">
+                        </div>
+                        <div class="user-info">
+                            <a href="#" class="user-info__name">
+                                {{ post.author.username }}
+                            </a>
+                            <span class="user-info__date">{{ post.created_at|date:"d M H:i" }}</span>
+                        </div>
+                    </div>
+                    
+                    {% if post.author == user %}
+                    <div class="post-card__manage">
+                        <a href="{% url 'posts:post_update' post.pk %}" class="manage-link"><i class='bx bx-edit-alt'></i></a>
+                        <a href="{% url 'posts:post_delete' post.pk %}" class="manage-link manage-link--delete"><i class='bx bx-trash'></i></a>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="post-card__content">
+                    <p>{{ post.content }}</p>
+                    {% if post.image %}
+                        <div class="post-card__image">
+                            <img src="{{ post.image.url }}" alt="Post image">
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="post-card__footer">
+                    <form action="{% url 'likes:like_post' post.pk %}" method="POST" class="like-form">
+                        {% csrf_token %}
+                        <button type="submit" class="action-btn {% if user in post.likes.all %}active{% endif %}">
+                            <i class='bx {% if user in post.likes.all %}bxs-heart{% else %}bx-heart{% endif %}'></i>
+                            <span>{{ post.likes.count }}</span>
+                        </button>
+                    </form>
+                    <button class="action-btn">
+                        <i class='bx bx-comment'></i>
+                        <span>0</span>
+                    </button>
+                </div>
+            </article>
+        {% empty %}
+            <div class="empty-feed"><i class="bx bx-leaf-alt"></i><br><br>У стрічці поки порожньо. Будь першим!</div>
+        {% endfor %}
+    </div>
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const modal = document.getElementById("postModal");
+        const sidebarBtn = document.querySelector(".new_post");
+        const feedBtn = document.getElementById("feedTrigger");
+        const span = document.querySelector(".modal__close");
+
+        const openModal = (e) => {
+            e.preventDefault();
+            modal.style.display = "block";
+        };
+
+        if (sidebarBtn) sidebarBtn.onclick = openModal;
+        if (feedBtn) feedBtn.onclick = openModal;
+
+        span.onclick = () => modal.style.display = "none";
+        window.onclick = (event) => {
+            if (event.target == modal) modal.style.display = "none";
+        };
+    });
+</script>
+{% endblock %}
