@@ -66,6 +66,9 @@
                     {% endif %}
                 </button>
             </form>
+            <a href="{% url 'chat:start_private_chat' profile.user.username %}" class="profile__button">
+                Написати
+            </a>
         {% endif %}
         <a href="{% url 'posts:home' %}" class="profile__button">На стрічку</a>
     </div>

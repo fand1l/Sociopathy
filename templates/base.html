@@ -58,8 +58,8 @@
                                     <i class="bx bx-user"></i>
                                     <span>Профіль</span>
                                 </a>
-                                <a href="#" class="sidebar-dropdown__item">
-                                    <i class="bx bx-message-square-dots"></i>
+                                <a href="{% url 'chat:thread_list' %}" class="sidebar-dropdown__item">
+                                    <i class="bx bx-message-circle"></i>
                                     <span>Повідомлення</span>
                                 </a>
                             </div>
@@ -73,7 +73,7 @@
                                     <span>Профіль</span>
                                 </a>
                                 <a href="{% url 'accounts:login' %}" class="sidebar-dropdown__item">
-                                    <i class="bx bx-message-square-dots"></i>
+                                    <i class="bx bx-message-circle"></i>
                                     <span>Повідомлення</span>
                                 </a>
                             </div>
@@ -125,7 +125,7 @@
             <h1 class="header__title">{% block header_title %}Головна{% endblock %}</h1>
         </header>
 
-        <section class="site__content">
+        <section class="site__content {% block content_class %}{% endblock %}">
             {% block content %}{% endblock %}
         </section>
     </main>

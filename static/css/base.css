@@ -156,6 +156,7 @@ html, body {
     transition: opacity 0.2s ease, transform 0.25s ease, visibility 0.2s ease;
     will-change: transform, opacity;
     z-index: 1200;
+    margin-left: 10px;
 }
 
 .sidebar-dropdown::before {
@@ -299,6 +300,16 @@ html, body {
     background-color: var(--main-bg);
     min-height: calc(100vh - 65px); 
     padding: 20px;
+}
+
+.site__content--chat {
+    padding: 28px 32px 32px;
+}
+
+@media (max-width: 980px) {
+    .site__content--chat {
+        padding: 20px;
+    }
 }
 
 .confirm-modal {
