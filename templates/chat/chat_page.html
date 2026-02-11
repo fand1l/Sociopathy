@@ -21,8 +21,11 @@
         <div class="chat-thread-list">
             {% for item in thread_items %}
                 <a class="chat-thread {% if thread and item.thread.id == thread.id %}chat-thread--active{% endif %}" href="{% url 'chat:chat_thread_detail' item.thread.id %}">
-                    <div class="chat-thread__avatar">
+                    <div class="chat-thread__avatar" data-user-id="{{ item.other.id }}" data-is-friend="{{ item.is_friend|yesno:'true,false' }}">
                         <img src="{{ item.other.profile.avatar_url }}" alt="{{ item.other.username }}" />
+                        {% if item.is_friend %}
+                            <span class="chat-status-indicator{% if item.is_online %} chat-status-indicator--online{% endif %}" aria-label="Онлайн"></span>
+                        {% endif %}
                     </div>
                     <div class="chat-thread__body">
                         <div class="chat-thread__name">{{ item.other.username }}</div>
@@ -36,18 +39,32 @@
     </aside>
 
     {% if thread %}
-    <section class="chat-panel">
+    <section class="chat-panel" data-other-user-id="{{ other_user.id }}" data-is-friend="{{ is_friend|yesno:'true,false' }}">
         <div class="chat-panel__header">
-            <h2>{{ other_user.username }}</h2>
-            <p>Спілкування в реальному часі</p>
+            <div class="chat-panel__title">
+                <div class="chat-panel__avatar" data-user-id="{{ other_user.id }}" data-is-friend="{{ is_friend|yesno:'true,false' }}">
+                    <img src="{{ other_user.profile.avatar_url }}" alt="{{ other_user.username }}" />
+                    {% if is_friend %}
+                        <span class="chat-status-indicator{% if is_online %} chat-status-indicator--online{% endif %}" aria-label="Онлайн"></span>
+                    {% endif %}
+                </div>
+                <div>
+                    <h2>{{ other_user.username }}</h2>
+                    <p>Спілкування в реальному часі</p>
+                </div>
+            </div>
+            <div id="chatTyping" class="chat-typing" aria-live="polite">Користувач друкує...</div>
         </div>
 
-        <ul id="chatMessages" class="chat-messages" aria-live="polite">
+        <ul id="chatMessages" class="chat-messages" aria-live="polite" data-current-user-id="{{ request.user.id }}">
             {% for message in chat_messages %}
-                <li class="chat-message {% if message.sender_id == request.user.id %}chat-message--own{% endif %}">
+                <li class="chat-message {% if message.sender_id == request.user.id %}chat-message--own{% endif %}" data-message-id="{{ message.id }}" data-sender-id="{{ message.sender_id }}">
                     <div class="chat-message__meta">
                         <span>{{ message.sender.username }}</span>
                         <time datetime="{{ message.created_at|date:"c" }}">{{ message.created_at|date:"H:i" }}</time>
+                        {% if message.sender_id == request.user.id %}
+                            <span class="chat-message__status">{% if message.read_at %}Прочитано{% endif %}</span>
+                        {% endif %}
                     </div>
                     <div class="chat-message__bubble">{{ message.text }}</div>
                 </li>
@@ -70,34 +87,96 @@
         const messagesEl = document.getElementById('chatMessages');
         const formEl = document.getElementById('chatForm');
         const inputEl = document.getElementById('chatInput');
-        if (!messagesEl || !formEl || !inputEl) return;
+    const typingEl = document.getElementById('chatTyping');
+        const panelEl = document.querySelector('.chat-panel');
+        if (!messagesEl || !formEl || !inputEl || !panelEl) return;
 
         const threadId = "{{ thread.id }}";
         const username = "{{ request.user.username|escapejs }}";
+        const currentUserId = Number(messagesEl.dataset.currentUserId);
         const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
         const socket = new WebSocket(`${scheme}://${window.location.host}/ws/chat/${threadId}/`);
+
+        const findStatusIndicators = (userId) =>
+            document.querySelectorAll(`.chat-thread__avatar[data-user-id="${userId}"], .chat-panel__avatar[data-user-id="${userId}"]`);
+
+        const updateOnlineIndicator = (userId, isOnline) => {
+            findStatusIndicators(userId).forEach((el) => {
+                if (el.dataset.isFriend !== 'true') return;
+                const indicator = el.querySelector('.chat-status-indicator');
+                if (!indicator) return;
+                indicator.classList.toggle('chat-status-indicator--online', isOnline);
+            });
+        };
+
+        const scrollToBottom = () => {
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        };
 
         const appendMessage = (payload) => {
             const item = document.createElement('li');
             item.className = 'chat-message';
-            if (payload.username === username) {
+            item.dataset.messageId = payload.message_id;
+            item.dataset.senderId = payload.sender_id;
+            if (payload.sender_id === currentUserId) {
                 item.classList.add('chat-message--own');
             }
             item.innerHTML = `
                 <div class="chat-message__meta">
                     <span>${payload.username}</span>
-                    <time>${new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}</time>
+                    <time>${new Date(payload.created_at || Date.now()).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}</time>
+                    ${payload.sender_id === currentUserId ? '<span class="chat-message__status"></span>' : ''}
                 </div>
                 <div class="chat-message__bubble"></div>
             `;
             item.querySelector('.chat-message__bubble').textContent = payload.message;
             messagesEl.appendChild(item);
-            messagesEl.scrollTop = messagesEl.scrollHeight;
+            scrollToBottom();
+            maybeSendReadReceipt();
+        };
+
+        const canMarkRead = () => !document.hidden && document.hasFocus();
+
+        const maybeSendReadReceipt = () => {
+            if (!canMarkRead()) return;
+            const lastMessage = Array.from(messagesEl.querySelectorAll('.chat-message'))
+                .filter((item) => Number(item.dataset.senderId) !== currentUserId)
+                .pop();
+            if (!lastMessage) return;
+            const nearBottom = messagesEl.scrollTop + messagesEl.clientHeight >= messagesEl.scrollHeight - 20;
+            if (!nearBottom) return;
+            socket.send(JSON.stringify({ type: 'read', message_id: Number(lastMessage.dataset.messageId) }));
+        };
+
+        let typingTimeout = null;
+        const sendTyping = (isTyping) => {
+            socket.send(JSON.stringify({ type: 'typing', is_typing: isTyping }));
         };
 
         socket.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            appendMessage(data);
+            if (data.type === 'message') {
+                appendMessage(data);
+                return;
+            }
+            if (data.type === 'typing') {
+                if (!typingEl || data.user_id === currentUserId) return;
+                typingEl.classList.toggle('chat-typing--active', data.is_typing);
+                return;
+            }
+            if (data.type === 'presence') {
+                updateOnlineIndicator(data.user_id, data.is_online);
+                return;
+            }
+            if (data.type === 'read_receipt') {
+                if (data.reader_id === currentUserId) return;
+                (data.message_ids || []).forEach((messageId) => {
+                    const messageEl = messagesEl.querySelector(`[data-message-id="${messageId}"]`);
+                    if (!messageEl || !messageEl.classList.contains('chat-message--own')) return;
+                    const statusEl = messageEl.querySelector('.chat-message__status');
+                    if (statusEl) statusEl.textContent = 'Прочитано';
+                });
+            }
         };
 
         formEl.addEventListener('submit', (event) => {
@@ -107,6 +186,20 @@
             socket.send(JSON.stringify({ message }));
             inputEl.value = '';
         });
+
+        inputEl.addEventListener('input', () => {
+            if (typingTimeout) clearTimeout(typingTimeout);
+            sendTyping(true);
+            typingTimeout = setTimeout(() => sendTyping(false), 1200);
+        });
+
+        inputEl.addEventListener('blur', () => sendTyping(false));
+        messagesEl.addEventListener('scroll', maybeSendReadReceipt);
+        window.addEventListener('focus', maybeSendReadReceipt);
+        document.addEventListener('visibilitychange', maybeSendReadReceipt);
+        scrollToBottom();
+        requestAnimationFrame(scrollToBottom);
+        maybeSendReadReceipt();
     });
 </script>
 {% endif %}

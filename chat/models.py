@@ -41,6 +41,14 @@ class ChatMessage(models.Model):
         null=True,
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    read_at = models.DateTimeField(blank=True, null=True)
+    read_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        related_name="read_messages",
+        blank=True,
+        null=True,
+    )
 
     class Meta:
         ordering = ["created_at"]

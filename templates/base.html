@@ -1,7 +1,9 @@
 {% load static %}
 
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="uk"
+    {% if user.is_authenticated and user.profile.theme_preference == "light" %}data-theme="light"{% endif %}
+    {% if user.is_authenticated and user.profile.accent_preference != "default" %}data-accent="{{ user.profile.accent_preference }}"{% endif %}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,7 +13,7 @@
     {% block extra_head %}{% endblock %}
     <title>{% block title %}Sociopathy{% endblock %}</title>
 </head>
-<body class="site">
+<body class="site" data-auth="{% if user.is_authenticated %}1{% else %}0{% endif %}">
     <aside class="site__sidebar">
         <div class="sidebar__inner">
             <div class="sidebar__logo">
@@ -88,18 +90,39 @@
                         <i class="bx bx-cog"></i>
                     </button>
                     <div class="sidebar-dropdown" aria-label="Налаштування">
-                        <button type="button" class="sidebar-dropdown__item sidebar-dropdown__item--button">
-                            <i class="bx bx-moon"></i>
-                            <span>Змінити тему</span>
-                        </button>
+                        <div class="theme-switcher">
+                            <button type="button" class="sidebar-dropdown__item theme-switcher__button" data-theme-value="dark">
+                                <i class="bx bx-moon"></i>
+                                <span>Темна</span>
+                            </button>
+                            <button type="button" class="sidebar-dropdown__item theme-switcher__button" data-theme-value="light">
+                                <i class="bx bx-sun"></i>
+                                <span>Світла</span>
+                            </button>
+                        </div>
+
                         <div class="sidebar-dropdown__divider"></div>
-                        <button type="button" class="sidebar-dropdown__item logout-trigger">
-                            <i class="bx bx-swap-diagonal"></i>
+
+                        <div class="accent-picker">
+                            <span class="accent-picker__title">Колір акценту:</span>
+                            <div class="accent-picker__grid">
+                                <button class="accent-dot accent-dot--white" data-color="default" title="Default"></button>
+                                <button class="accent-dot accent-dot--blue" data-color="blue" title="Blue"></button>
+                                <button class="accent-dot accent-dot--purple" data-color="purple" title="Purple"></button>
+                                <button class="accent-dot accent-dot--pink" data-color="pink" title="Pink"></button>
+                                <button class="accent-dot accent-dot--orange" data-color="orange" title="Orange"></button>
+                            </div>
+                        </div>
+
+                        <div class="sidebar-dropdown__divider"></div>
+
+                        <a href="{% url 'accounts:logout' %}?next={% url 'accounts:login' %}" class="sidebar-dropdown__item">
+                            <i class="bx bx-refresh-cw"></i>
                             <span>Змінити обліковий запис</span>
-                        </button>
+                        </a>
                         <button type="button" class="sidebar-dropdown__item sidebar-dropdown__item--danger logout-trigger">
                             <i class="bx bx-arrow-out-right-square-half"></i>
-                            <span>Вихід</span>
+                            <span>Вийти</span>
                         </button>
                     </div>
                 {% else %}
@@ -107,10 +130,32 @@
                         <i class="bx bx-cog"></i>
                     </a>
                     <div class="sidebar-dropdown" aria-label="Налаштування">
-                        <button type="button" class="sidebar-dropdown__item sidebar-dropdown__item--button">
-                            <i class="bx bx-moon"></i>
-                            <span>Змінити тему</span>
-                        </button>
+                        <div class="theme-switcher">
+                            <button type="button" class="sidebar-dropdown__item theme-switcher__button" data-theme-value="dark">
+                                <i class="bx bx-moon"></i>
+                                <span>Темна</span>
+                            </button>
+                            <button type="button" class="sidebar-dropdown__item theme-switcher__button" data-theme-value="light">
+                                <i class="bx bx-sun"></i>
+                                <span>Світла</span>
+                            </button>
+                        </div>
+
+                        <div class="sidebar-dropdown__divider"></div>
+
+                        <div class="accent-picker">
+                            <span class="accent-picker__title">Колір акценту:</span>
+                            <div class="accent-picker__grid">
+                                <button class="accent-dot accent-dot--white" data-color="default" title="Default"></button>
+                                <button class="accent-dot accent-dot--blue" data-color="blue" title="Blue"></button>
+                                <button class="accent-dot accent-dot--purple" data-color="purple" title="Purple"></button>
+                                <button class="accent-dot accent-dot--pink" data-color="pink" title="Pink"></button>
+                                <button class="accent-dot accent-dot--orange" data-color="orange" title="Orange"></button>
+                            </div>
+                        </div>
+
+                        <div class="sidebar-dropdown__divider"></div>
+
                         <a href="{% url 'accounts:login' %}" class="sidebar-dropdown__item">
                             <i class="bx bx-arrow-in-right-square-half"></i>
                             <span>Логін</span>
@@ -144,7 +189,7 @@
                 {% csrf_token %}
                 <div class="confirm-modal__actions">
                     <button type="button" class="confirm-modal__cancel">Скасувати</button>
-                    <button type="submit" class="confirm-modal__confirm">Вийти</button>
+                    <button type="submit" class="confirm-modal__confirm logout-confirm">Вийти</button>
                 </div>
             </form>
         </div>
@@ -175,6 +220,81 @@
                 if (event.target === modal) closeModal();
             });
         });
+
+        const html = document.documentElement;
+        const isAuthenticated = document.body.dataset.auth === '1';
+        const preferencesUrl = '{% url "accounts:theme_preferences" %}';
+
+        const getCookie = (name) => {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return '';
+        };
+
+        const persistPreferences = (payload) => {
+            if (!isAuthenticated) {
+                if (payload.theme) localStorage.setItem('site-theme', payload.theme);
+                if (payload.accent) localStorage.setItem('site-accent', payload.accent);
+                return;
+            }
+
+            fetch(preferencesUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: JSON.stringify(payload),
+            }).catch(() => {});
+        };
+
+        const syncThemeButtons = (theme) => {
+            document.querySelectorAll('.theme-switcher__button').forEach((btn) => {
+                btn.classList.toggle('is-active', btn.dataset.themeValue === theme);
+            });
+        };
+
+        const syncAccentDots = (accent) => {
+            document.querySelectorAll('.accent-dot').forEach((dot) => {
+                dot.classList.toggle('is-active', dot.dataset.color === accent);
+            });
+        };
+
+        const updateTheme = (theme, persist = true) => {
+            if (theme === 'light') html.setAttribute('data-theme', 'light');
+            else html.removeAttribute('data-theme');
+            syncThemeButtons(theme);
+            if (persist) persistPreferences({ theme });
+        };
+
+        const updateAccent = (color, persist = true) => {
+            if (color === 'default') html.removeAttribute('data-accent');
+            else html.setAttribute('data-accent', color);
+            syncAccentDots(color);
+            if (persist) persistPreferences({ accent: color });
+        };
+
+        document.querySelectorAll('.theme-switcher__button').forEach((btn) => {
+            btn.addEventListener('click', () => updateTheme(btn.dataset.themeValue));
+        });
+
+        document.querySelectorAll('.accent-dot').forEach((dot) => {
+            dot.addEventListener('click', () => updateAccent(dot.getAttribute('data-color')));
+        });
+
+        if (!isAuthenticated) {
+            const savedTheme = localStorage.getItem('site-theme');
+            const savedAccent = localStorage.getItem('site-accent');
+
+            if (savedTheme) updateTheme(savedTheme, false);
+            if (savedAccent) updateAccent(savedAccent, false);
+        } else {
+            const currentTheme = html.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+            const currentAccent = html.getAttribute('data-accent') || 'default';
+            syncThemeButtons(currentTheme);
+            syncAccentDots(currentAccent);
+        }
     </script>
 </body>
 </html>
