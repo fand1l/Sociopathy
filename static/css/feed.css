@@ -165,6 +165,7 @@
     width: 100%;
     border-radius: 12px;
     display: block;
+    border: #303030 1px solid;
 }
 
 .post-card__footer {
@@ -297,7 +298,6 @@ input[type="file"] {
     height: 36px;
 }
 
-/* Промо-блок для неавторизованих */
 .feed__auth-promo {
     background-color: var(--sidebar-bg);
     padding: 20px;
@@ -313,7 +313,30 @@ input[type="file"] {
     text-decoration: none;
 }
 
-/* Виправлення відступів у хедері картинок */
 .avatar-wrapper {
     flex-shrink: 0;
+}
+
+.action-btn i {
+    display: inline-block;
+    transition: color 0.2s ease;
+}
+
+@keyframes jelly {
+    0% { transform: scale(1, 1) translateY(0); }
+    15% { transform: scale(1.3, 0.7) translateY(0); }
+    40% { transform: scale(0.55, 1.45) translateY(-18px); }
+    70% { transform: scale(1.15, 0.85) translateY(0); }
+    85% { transform: scale(0.95, 1.05) translateY(-3px); }
+    95% { transform: scale(1.15, 1) translateY(0); }
+    100% { transform: scale(1, 1) translateY(0); }
+}
+
+.jelly-anim {
+    animation: jelly 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+}
+
+.action-btn.active i.bxf {
+    color: #ff4b4b;
+    filter: drop-shadow(0 0 4px rgba(255, 75, 75, 0.3));
 }

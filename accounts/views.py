@@ -7,6 +7,7 @@ from django.views.decorators.http import require_GET, require_http_methods
 
 from .forms import RegisterForm, ProfileForm
 from .models import Profile
+from likes.models import Like
 
 User = get_user_model()
 
@@ -76,6 +77,7 @@ def username_check(request):
 @login_required
 def profile_view(request):
 	profile, _ = Profile.objects.get_or_create(user=request.user)
+	total_likes = Like.objects.filter(post__author=profile.user).count()
 	return render(
 		request,
 		"accounts/profile.html",
@@ -83,6 +85,7 @@ def profile_view(request):
 			"profile": profile,
 			"is_owner": True,
 			"follow_state": None,
+			"total_likes": total_likes,
 		},
 	)
 
@@ -92,6 +95,7 @@ def profile_detail_view(request, username):
 	user = get_object_or_404(User, username=username)
 	profile, _ = Profile.objects.get_or_create(user=user)
 	viewer_profile, _ = Profile.objects.get_or_create(user=request.user)
+	total_likes = Like.objects.filter(post__author=profile.user).count()
 
 	following = profile.followers.filter(pk=viewer_profile.pk).exists()
 	followed_by = profile.following.filter(pk=viewer_profile.pk).exists()
@@ -112,6 +116,7 @@ def profile_detail_view(request, username):
 			"profile": profile,
 			"is_owner": user == request.user,
 			"follow_state": follow_state,
+			"total_likes": total_likes,
 		},
 	)
 
@@ -120,7 +125,12 @@ def profile_detail_view(request, username):
 @require_http_methods(["GET", "POST"])
 def profile_edit_view(request):
 	profile, _ = Profile.objects.get_or_create(user=request.user)
-	form = ProfileForm(request.POST or None, request.FILES or None, instance=profile)
+	form = ProfileForm(
+		request.POST or None,
+		request.FILES or None,
+		instance=profile,
+		user=request.user,
+	)
 
 	if request.method == "POST" and form.is_valid():
 		form.save()
