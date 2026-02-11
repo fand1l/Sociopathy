@@ -47,7 +47,7 @@
                     <form action="{% url 'likes:like_post' post.pk %}" method="POST" class="like-form">
                         {% csrf_token %}
                         <button type="submit" class="action-btn {% if post.is_liked %}active{% endif %}">
-                            <i class='bx {% if post.is_liked %}bxs-heart{% else %}bx-heart{% endif %}'></i>
+                            <i class='{% if post.is_liked %}bxf{% else %}bx{% endif %} bx-heart'></i>
                             <span>{{ post.likes.count }}</span>
                         </button>
                     </form>
@@ -58,13 +58,7 @@
                     <form action="{% url 'bookmarks:toggle' post.pk %}" method="POST" class="bookmark-form">
                         {% csrf_token %}
                         <button type="submit" class="action-btn {% if post.is_bookmarked %}active{% endif %}">
-                            <i class='bx {% if post.is_bookmarked %}bxs-bookmark{% else %}bx-bookmark{% endif %}'></i>
-                        </button>
-                    </form>
-                    <form action="{% url 'bookmarks:remove' post.pk %}" method="POST" class="bookmark-remove-form">
-                        {% csrf_token %}
-                        <button type="submit" class="action-btn">
-                            <i class='bx bx-x'></i>
+                            <i class='{% if post.is_bookmarked %}bxf{% else %}bx{% endif %} bx-bookmark'></i>
                         </button>
                     </form>
                 </div>
@@ -115,12 +109,12 @@
 
                 if (data.liked) {
                     button.classList.add('active');
-                    icon.classList.remove('bx-heart');
-                    icon.classList.add('bxs-heart');
+                    icon.classList.remove('bx');
+                    icon.classList.add('bxf');
                 } else {
                     button.classList.remove('active');
-                    icon.classList.remove('bxs-heart');
-                    icon.classList.add('bx-heart');
+                    icon.classList.remove('bxf');
+                    icon.classList.add('bx');
                 }
 
                 if (count && typeof data.likes_count !== 'undefined') {
@@ -136,12 +130,12 @@
 
                 if (data.bookmarked) {
                     button.classList.add('active');
-                    icon.classList.remove('bx-bookmark');
-                    icon.classList.add('bxs-bookmark');
+                    icon.classList.remove('bx');
+                    icon.classList.add('bxf');
                 } else {
                     button.classList.remove('active');
-                    icon.classList.remove('bxs-bookmark');
-                    icon.classList.add('bx-bookmark');
+                    icon.classList.remove('bxf');
+                    icon.classList.add('bx');
                 }
             });
         });
