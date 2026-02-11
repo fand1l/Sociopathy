@@ -1,56 +1,22 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block title %}Головна{% endblock %}
+
+{% block title %}Закладки{% endblock %}
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'css/feed.css' %}">
 {% endblock %}
 
+{% block header_title %}Закладки{% endblock %}
+
 {% block content %}
 <div class="feed-container">
-    <div class="feed__trigger" id="feedTrigger">
-        <div class="trigger__avatar">
-            {% if user.is_authenticated %}
-                <img src="{{ user.profile.avatar_url }}" alt="My Avatar" class="user-avatar">
-            {% else %}
-                <div class="avatar-stub"></div> 
-            {% endif %}
-        </div>
-        <div class="trigger__input">Що у вас на думці?</div>
-    </div>
-
-    <div id="postModal" class="modal">
-        <div class="modal__content">
-            <div class="modal__header">
-                <h3>Новий пост</h3>
-                <span class="modal__close"><i class="bx bx-x"></i></span>
-            </div>
-            <form method="POST" action="{% url 'posts:home' %}" enctype="multipart/form-data">
-                {% csrf_token %}
-                {{ form.content }}
-                
-                <div class="modal__upload">
-                    <label for="file-upload" class="custom-file-upload">
-                        <i class="bx bx-image-add"></i> Додати фото
-                    </label>
-                    {{ form.image }}
-                </div>
-
-                <div class="modal__footer">
-                    <button type="submit" class="modal__button">Опублікувати</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <div class="posts-list">
         {% for post in posts %}
             <article class="post-card">
                 <div class="post-card__header">
                     <div class="post-card__user">
                         <div class="avatar-wrapper">
-                            <a href="{% url 'accounts:profile_detail' post.author.username %}">
-                                <img src="{{ post.author.profile.avatar_url }}" alt="{{ post.author.username }}" class="user-avatar user-avatar--small">
-                            </a>
+                            <img src="{{ post.author.profile.avatar_url }}" alt="{{ post.author.username }}" class="user-avatar user-avatar--small">
                         </div>
                         <div class="user-info">
                             <a href="{% url 'accounts:profile_detail' post.author.username %}" class="user-info__name">
@@ -59,7 +25,7 @@
                             <span class="user-info__date">{{ post.created_at|date:"d M H:i" }}</span>
                         </div>
                     </div>
-                    
+
                     {% if post.author == user %}
                     <div class="post-card__manage">
                         <a href="{% url 'posts:post_update' post.pk %}" class="manage-link"><i class='bx bx-edit-alt'></i></a>
@@ -98,36 +64,12 @@
                 </div>
             </article>
         {% empty %}
-            <div class="empty-feed"><i class="bx bx-leaf-alt"></i><br><br>У стрічці поки порожньо. Будь першим!</div>
+            <div class="empty-feed"><i class="bx bx-bookmark"></i><br><br>У вас поки немає закладок.</div>
         {% endfor %}
     </div>
 </div>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-    const modal = document.getElementById("postModal");
-    const sidebarBtn = document.querySelector(".new_post");
-    const feedBtn = document.getElementById("feedTrigger");
-    const isAuthenticated = "{{ user.is_authenticated|yesno:'true,false' }}" === "true";
-    const registerUrl = "{% url 'accounts:register' %}";
-        const span = document.querySelector(".modal__close");
-
-        const openModal = (e) => {
-            e.preventDefault();
-            if (!isAuthenticated) {
-                window.location.href = registerUrl;
-                return;
-            }
-            modal.style.display = "block";
-        };
-
-        if (sidebarBtn) sidebarBtn.onclick = openModal;
-        if (feedBtn) feedBtn.onclick = openModal;
-
-        span.onclick = () => modal.style.display = "none";
-        window.onclick = (event) => {
-            if (event.target == modal) modal.style.display = "none";
-        };
-
         const getCsrfToken = (form) => {
             const csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
             return csrfInput ? csrfInput.value : "";
@@ -165,26 +107,15 @@
                 const icon = button.querySelector('i');
                 const count = button.querySelector('span');
 
-                // Скидаємо анімацію перед початком
-                icon.classList.remove('jelly-anim');
-                void icon.offsetWidth;
-
                 if (data.liked) {
                     button.classList.add('active');
-
                     icon.classList.remove('bx');
                     icon.classList.add('bxf');
-
-                    icon.classList.add('jelly-anim');
                 } else {
                     button.classList.remove('active');
-
                     icon.classList.remove('bxf');
                     icon.classList.add('bx');
-
-                    icon.classList.remove('jelly-anim');
                 }
-
 
                 if (count && typeof data.likes_count !== 'undefined') {
                     count.textContent = data.likes_count;

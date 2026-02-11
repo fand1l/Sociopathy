@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Чат{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chat.css' %}">
+{% endblock %}
+
+{% block content_class %}site__content--chat{% endblock %}
+
+{% block header_title %}Чат{% endblock %}
+
+{% block content %}
+<div class="chat-layout{% if not thread %} chat-layout--list{% endif %}">
+    <aside class="chat-threads{% if not thread %} chat-threads--center{% endif %}">
+        <div class="chat-panel__header">
+            <h2>Діалоги</h2>
+            <p>Оберіть користувача, щоб почати спілкування.</p>
+        </div>
+        <div class="chat-thread-list">
+            {% for item in thread_items %}
+                <a class="chat-thread {% if thread and item.thread.id == thread.id %}chat-thread--active{% endif %}" href="{% url 'chat:chat_thread_detail' item.thread.id %}">
+                    <div class="chat-thread__avatar">
+                        <img src="{{ item.other.profile.avatar_url }}" alt="{{ item.other.username }}" />
+                    </div>
+                    <div class="chat-thread__body">
+                        <div class="chat-thread__name">{{ item.other.username }}</div>
+                        <div class="chat-thread__meta">Останнє оновлення: {{ item.thread.updated_at|date:"d.m.Y H:i" }}</div>
+                    </div>
+                </a>
+            {% empty %}
+                <div class="chat-empty">Немає доступних діалогів.</div>
+            {% endfor %}
+        </div>
+    </aside>
+
+    {% if thread %}
+    <section class="chat-panel">
+        <div class="chat-panel__header">
+            <h2>{{ other_user.username }}</h2>
+            <p>Спілкування в реальному часі</p>
+        </div>
+
+        <ul id="chatMessages" class="chat-messages" aria-live="polite">
+            {% for message in chat_messages %}
+                <li class="chat-message {% if message.sender_id == request.user.id %}chat-message--own{% endif %}">
+                    <div class="chat-message__meta">
+                        <span>{{ message.sender.username }}</span>
+                        <time datetime="{{ message.created_at|date:"c" }}">{{ message.created_at|date:"H:i" }}</time>
+                    </div>
+                    <div class="chat-message__bubble">{{ message.text }}</div>
+                </li>
+            {% empty %}
+                <li class="chat-empty">Немає повідомлень. Напишіть першим!</li>
+            {% endfor %}
+        </ul>
+
+        <form id="chatForm" class="chat-form" autocomplete="off">
+            <input type="text" id="chatInput" placeholder="Напишіть повідомлення..." required>
+            <button type="submit">Надіслати</button>
+        </form>
+    </section>
+    {% endif %}
+</div>
+
+{% if thread %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const messagesEl = document.getElementById('chatMessages');
+        const formEl = document.getElementById('chatForm');
+        const inputEl = document.getElementById('chatInput');
+        if (!messagesEl || !formEl || !inputEl) return;
+
+        const threadId = "{{ thread.id }}";
+        const username = "{{ request.user.username|escapejs }}";
+        const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const socket = new WebSocket(`${scheme}://${window.location.host}/ws/chat/${threadId}/`);
+
+        const appendMessage = (payload) => {
+            const item = document.createElement('li');
+            item.className = 'chat-message';
+            if (payload.username === username) {
+                item.classList.add('chat-message--own');
+            }
+            item.innerHTML = `
+                <div class="chat-message__meta">
+                    <span>${payload.username}</span>
+                    <time>${new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}</time>
+                </div>
+                <div class="chat-message__bubble"></div>
+            `;
+            item.querySelector('.chat-message__bubble').textContent = payload.message;
+            messagesEl.appendChild(item);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        };
+
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            appendMessage(data);
+        };
+
+        formEl.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const message = inputEl.value.trim();
+            if (!message) return;
+            socket.send(JSON.stringify({ message }));
+            inputEl.value = '';
+        });
+    });
+</script>
+{% endif %}
+{% endblock %}

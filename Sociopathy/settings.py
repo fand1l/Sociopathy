@@ -34,6 +34,7 @@ AUTH_USER_MODEL = 'accounts.CustomUser'
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -41,11 +42,15 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
+    'channels',
+
     'core',
     'accounts',
     'relationships',
     'likes',
+    'bookmarks',
     'posts',
+    'chat',
 ]
 
 MIDDLEWARE = [
@@ -76,6 +81,13 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'Sociopathy.wsgi.application'
+ASGI_APPLICATION = 'Sociopathy.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
+    }
+}
 
 
 # Database

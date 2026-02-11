@@ -22,6 +22,14 @@
         {% csrf_token %}
 
         <div class="profile__field">
+            <label class="profile__label" for="id_username">Нікнейм</label>
+            {{ form.username }}
+            {% if form.username.errors %}
+                <div class="profile__error">{{ form.username.errors|striptags }}</div>
+            {% endif %}
+        </div>
+
+        <div class="profile__field">
             <label class="profile__label" for="id_bio">Про себе</label>
             {{ form.bio }}
         </div>

@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Повідомлення{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chat.css' %}">
+{% endblock %}
+
+{% block header_title %}Повідомлення{% endblock %}
+
+{% block content %}
+<div class="chat-layout chat-layout--list">
+    <section class="chat-panel">
+        <div class="chat-panel__header">
+            <h2>Діалоги</h2>
+            <p>Оберіть користувача, щоб почати спілкування.</p>
+        </div>
+        <div class="chat-thread-list">
+            {% for item in thread_items %}
+                <a class="chat-thread" href="{% url 'chat:chat_thread_detail' item.thread.id %}">
+                    <div class="chat-thread__avatar">{{ item.other.username|slice:":1"|upper }}</div>
+                    <div class="chat-thread__body">
+                        <div class="chat-thread__name">{{ item.other.username }}</div>
+                        <div class="chat-thread__meta">Останнє оновлення: {{ item.thread.updated_at|date:"d.m.Y H:i" }}</div>
+                    </div>
+                </a>
+            {% empty %}
+                <div class="chat-empty">
+                    Поки що немає діалогів. Перейдіть у профіль користувача, щоб написати.
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+{% endblock %}

@@ -28,6 +28,12 @@ class Profile(models.Model):
         related_name="profile"
     )
 
+    username_last_changed = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Остання зміна нікнейму"
+    )
+
     bio = models.TextField(
         max_length=500,
         blank=True,

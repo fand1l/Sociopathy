@@ -42,6 +42,10 @@
             <span>{{ profile.following.count }}</span>
             <small>Підписок</small>
         </div>
+        <div class="profile__stat">
+            <span>{{ total_likes }}</span>
+            <small>Вподобань</small>
+        </div>
     </div>
 
     <div class="profile__actions">
@@ -62,6 +66,9 @@
                     {% endif %}
                 </button>
             </form>
+            <a href="{% url 'chat:start_private_chat' profile.user.username %}" class="profile__button">
+                Написати
+            </a>
         {% endif %}
         <a href="{% url 'posts:home' %}" class="profile__button">На стрічку</a>
     </div>
