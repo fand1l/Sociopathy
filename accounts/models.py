@@ -52,6 +52,22 @@ class Profile(models.Model):
         upload_to='cover_pics'
     )
 
+    theme_preference = models.CharField(
+        max_length=10,
+        choices=(
+            ("dark", "Dark"),
+            ("light", "Light"),
+        ),
+        default="dark",
+        verbose_name="Тема",
+    )
+
+    accent_preference = models.CharField(
+        max_length=12,
+        default="default",
+        verbose_name="Акцент",
+    )
+
     following = models.ManyToManyField(
         "self",
         through="relationships.Follow",

@@ -1,21 +1,12 @@
-:root {
-    --auth-card-bg: #1e1e1e;
-    --auth-border: #2a2a2a;
-    --auth-text: #e5e5e5;
-    --auth-muted: #8a8a8a;
-    --auth-success: #4ade80;
-    --auth-danger: #f87171;
-}
-
 .auth {
     max-width: 420px;
     margin: 40px auto 0;
-    background: var(--auth-card-bg);
-    border: 1px solid var(--auth-border);
+    background: var(--content-bg);
+    border: 1px solid var(--color-border);
     border-radius: 18px;
     padding: 28px;
-    color: var(--auth-text);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+    color: var(--color-text);
+    box-shadow: 0 12px 40px var(--color-shadow-strong);
 }
 
 .auth__title {
@@ -24,7 +15,7 @@
 }
 
 .auth__subtitle {
-    color: var(--auth-muted);
+    color: var(--color-text-muted);
     font-size: 0.95rem;
     margin-bottom: 20px;
 }
@@ -37,17 +28,17 @@
 }
 
 .auth__file {
-    background: #151515;
-    border: 1px dashed #2e2e2e;
+    background: var(--color-input-bg);
+    border: 1px dashed var(--color-border-strong);
     border-radius: 12px;
     padding: 12px 14px;
-    color: var(--auth-muted);
+    color: var(--color-text-muted);
     font-size: 0.95rem;
 }
 
 .auth__file::file-selector-button {
-    background: #ffffff;
-    color: #111;
+    background: var(--button-bg);
+    color: var(--button-text);
     border: none;
     padding: 6px 10px;
     border-radius: 999px;
@@ -57,39 +48,39 @@
 }
 
 .auth__hint {
-    color: var(--auth-muted);
+    color: var(--color-text-muted);
     font-size: 0.8rem;
 }
 
 .auth__label {
     font-size: 0.9rem;
-    color: var(--auth-muted);
+    color: var(--color-text-muted);
 }
 
 .auth__input {
-    background: #151515;
-    border: 1px solid #2e2e2e;
+    background: var(--color-input-bg);
+    border: 1px solid var(--color-border-strong);
     border-radius: 12px;
     padding: 12px 14px;
-    color: var(--auth-text);
+    color: var(--color-text);
     font-size: 1rem;
     outline: none;
     transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .auth__input:focus {
-    border-color: #5b5b5b;
-    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
+    border-color: var(--color-surface-5);
+    box-shadow: 0 0 0 3px var(--color-input-shadow);
 }
 
 .auth__input.is-valid {
-    border-color: var(--auth-success);
-    box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.18);
+    border-color: var(--color-success);
+    box-shadow: 0 0 0 3px var(--color-success-shadow);
 }
 
 .auth__input.is-invalid {
-    border-color: var(--auth-danger);
-    box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.18);
+    border-color: var(--color-danger);
+    box-shadow: 0 0 0 3px var(--color-danger-shadow);
 }
 
 .auth__status {
@@ -98,11 +89,11 @@
 }
 
 .auth__status--success {
-    color: var(--auth-success);
+    color: var(--color-success);
 }
 
 .auth__status--error {
-    color: var(--auth-danger);
+    color: var(--color-danger);
 }
 
 .auth__actions {
@@ -114,8 +105,8 @@
 }
 
 .auth__button {
-    background: #ffffff;
-    color: #111;
+    background: var(--button-bg);
+    color: var(--button-text);
     border: none;
     padding: 10px 18px;
     border-radius: 999px;
@@ -124,20 +115,20 @@
 }
 
 .auth__link {
-    color: var(--auth-muted);
+    color: var(--color-text-muted);
     text-decoration: none;
 }
 
 .auth__link:hover {
-    color: var(--auth-text);
+    color: var(--color-text);
 }
 
 .auth__errors {
-    background: rgba(248, 113, 113, 0.12);
-    border: 1px solid rgba(248, 113, 113, 0.3);
+    background: var(--color-danger-soft-bg);
+    border: 1px solid var(--color-danger-soft-border);
     border-radius: 12px;
     padding: 10px 12px;
     margin-bottom: 16px;
-    color: var(--auth-danger);
+    color: var(--color-danger);
     font-size: 0.9rem;
 }

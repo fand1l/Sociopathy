@@ -1,9 +1,11 @@
+import json
+
 from django.contrib.auth import get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
-from django.views.decorators.http import require_GET, require_http_methods
+from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from .forms import RegisterForm, ProfileForm
 from .models import Profile
@@ -53,7 +55,8 @@ def login_view(request):
 
 def logout_view(request):
 	logout(request)
-	return redirect("posts:home")
+	next_url = request.GET.get("next")
+	return redirect(next_url or "posts:home")
 
 
 @require_GET
@@ -140,4 +143,40 @@ def profile_edit_view(request):
 		request,
 		"accounts/profile_edit.html",
 		{"form": form, "profile": profile},
+	)
+
+
+@login_required
+@require_POST
+def theme_preferences_view(request):
+	profile, _ = Profile.objects.get_or_create(user=request.user)
+
+	data = {}
+	if request.content_type == "application/json":
+		try:
+			data = json.loads(request.body or "{}")
+		except json.JSONDecodeError:
+			data = {}
+	else:
+		data = request.POST
+
+	allowed_themes = {"dark", "light"}
+	allowed_accents = {"default", "blue", "purple", "pink", "orange"}
+
+	updates = []
+	if (theme := data.get("theme")) in allowed_themes:
+		profile.theme_preference = theme
+		updates.append("theme_preference")
+	if (accent := data.get("accent")) in allowed_accents:
+		profile.accent_preference = accent
+		updates.append("accent_preference")
+
+	if updates:
+		profile.save(update_fields=updates)
+
+	return JsonResponse(
+		{
+			"theme": profile.theme_preference,
+			"accent": profile.accent_preference,
+		}
 	)

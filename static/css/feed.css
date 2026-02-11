@@ -6,7 +6,7 @@
     top: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.7); /* Напівпрозорий чорний */
+    background-color: var(--color-overlay-strong); /* Напівпрозорий чорний */
     backdrop-filter: blur(4px); /* Ефект розмиття фону */
 }
 
@@ -18,7 +18,7 @@
     width: 90%;
     max-width: 500px;
     border-radius: 15px;
-    border: 1px solid #333;
+    border: 1px solid var(--color-border-strong);
     color: var(--accent-color);
 }
 
@@ -40,15 +40,15 @@
     height: 150px;
     background: transparent;
     border: none;
-    color: white;
+    color: var(--color-text);
     font-size: 1.1rem;
     resize: none;
     outline: none;
 }
 
 .modal__button {
-    background-color: var(--accent-color);
-    color: black;
+    background-color: var(--button-bg);
+    color: var(--button-text);
     border: none;
     padding: 10px 20px;
     border-radius: 20px;
@@ -74,20 +74,20 @@
     cursor: pointer;
     margin-bottom: 25px;
     transition: background-color 0.2s ease;
-    border: 1px solid #333;
+    border: 1px solid var(--color-border-strong);
     max-width: 600px;
     margin-left: auto;
     margin-right: auto;
 }
 
 .feed__trigger:hover {
-    background-color: #2a2a2a;
+    background-color: var(--color-surface-3);
 }
 
 .avatar-stub {
     width: 40px;
     height: 40px;
-    background-color: #444;
+    background-color: var(--color-avatar-bg);
     border-radius: 50%;
 }
 
@@ -111,7 +111,7 @@
     font-size: 24px;
     text-align: center;
     font-weight: 600;
-    color: #636363;
+    color: var(--color-text-inactive);
 }
 
 .empty-feed i {
@@ -122,7 +122,7 @@
     border-radius: 20px;
     padding: 20px;
     margin-bottom: 20px;
-    border: 1px solid #2a2a2a;
+    border: 1px solid var(--color-border);
     transition: transform 0.2s ease;
 }
 
@@ -157,7 +157,7 @@
 }
 
 .post-card__content p {
-    color: #e0e0e0;
+    color: var(--color-text-secondary);
     line-height: 1.5;
     margin-bottom: 15px;
     white-space: pre-wrap;
@@ -167,14 +167,14 @@
     width: 100%;
     border-radius: 12px;
     display: block;
-    border: #303030 1px solid;
+    border: var(--color-border-strong) 1px solid;
 }
 
 .post-card__footer {
     display: flex;
     gap: 10px;
     margin-top: 15px;
-    border-top: 1px solid #2a2a2a;
+    border-top: 1px solid var(--color-border);
     padding-top: 15px;
 }
 
@@ -193,19 +193,19 @@
 
 .action-btn:hover {
     color: var(--accent-color);
-    background-color: #363636;
-    box-shadow: 0 0 20px #2b2b2b;
+    background-color: var(--color-surface-4);
+    box-shadow: 0 0 20px var(--color-surface-3);
     border-radius: 20px;
 }
 
 .action-btn.active {
-    color: #ff4b4b;
+    color: var(--color-danger);
 }
 
 .avatar-stub--small {
     width: 36px;
     height: 36px;
-    background: #333;
+    background: var(--color-avatar-bg);
     border-radius: 50%;
 }
 
@@ -218,12 +218,12 @@
 }
 
 .manage-link--delete:hover {
-    color: #ff4b4b;
+    color: var(--color-danger);
 }
 
 .modal__upload {
     margin: 0;
-    background-color: #313131;
+    background-color: var(--color-surface-4);
     width: 120px;
     padding: 5px 5px 10px 10px;
     border-radius: 20px;
@@ -265,7 +265,7 @@
     margin-top: 12px;
     border-radius: 12px;
     overflow: hidden;
-    border: 1px solid #2a2a2a;
+    border: 1px solid var(--color-border);
 }
 
 .modal--edit .modal__image-preview img {
@@ -296,13 +296,13 @@ input[type="file"] {
     display: block !important;
     border-radius: 50%;
     object-fit: cover;
-    background-color: #333;
+    background-color: var(--color-avatar-bg);
     transition: transform 0.3s ease;
 }
 
 .user-avatar:hover {
     transform: scale(1.2);
-    box-shadow: 0 0 20px #2b2b2b;
+    box-shadow: 0 0 20px var(--color-surface-3);
 }
 
 .user-avatar--small {
@@ -315,7 +315,7 @@ input[type="file"] {
     padding: 20px;
     border-radius: 15px;
     text-align: center;
-    border: 1px dashed #444;
+    border: 1px dashed var(--color-border-muted);
     margin-bottom: 25px;
 }
 
@@ -349,6 +349,6 @@ input[type="file"] {
 }
 
 .action-btn.active i.bxf {
-    color: #ff4b4b;
-    filter: drop-shadow(0 0 4px rgba(255, 75, 75, 0.3));
+    color: var(--color-danger);
+    filter: drop-shadow(0 0 4px var(--color-shadow-danger));
 }
