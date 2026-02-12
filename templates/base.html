@@ -26,7 +26,11 @@
                 <ul class="menu__list">
                     <li class="menu__item">
                         <a href="{% url 'posts:home' %}" class="menu__link {% if request.resolver_match.view_name == 'posts:home' %}menu__link--active{% endif %}">
-                            <i class="bx bx-home-alt-2"></i>
+                            {% if request.resolver_match.view_name == 'posts:home' %}
+                                <i class="bxf bx-home-alt-2"></i>
+                            {% else %}
+                                <i class="bx bx-home-alt-2"></i>
+                            {% endif %}
                         </a>
                     </li>
                     <li class="menu__item">
@@ -47,13 +51,21 @@
                     </li>
                     <li class="menu__item">
                         <a href="{% url 'bookmarks:list' %}" class="menu__link {% if request.resolver_match.view_name == 'bookmarks:list' %}menu__link--active{% endif %}">
-                            <i class="bx bx-bookmark"></i>
+                            {% if request.resolver_match.view_name == 'bookmarks:list' %}
+                                <i class="bxf bx-bookmark"></i>
+                            {% else %}
+                                <i class="bx bx-bookmark"></i>
+                            {% endif %}
                         </a>
                     </li>
                     <li class="menu__item menu__item--dropdown">
                         {% if user.is_authenticated %}
                             <a href="{% url 'accounts:profile' %}" class="menu__link {% if request.resolver_match.view_name == 'accounts:profile' %}menu__link--active{% endif %}">
-                                <i class="bx bx-user"></i>
+                                {% if request.resolver_match.view_name == 'accounts:profile' %}
+                                    <i class="bxf bx-user"></i>
+                                {% else %}
+                                    <i class="bx bx-user"></i>
+                                {% endif %}
                             </a>
                             <div class="sidebar-dropdown" aria-label="Профіль">
                                 <a href="{% url 'accounts:profile' %}" class="sidebar-dropdown__item">

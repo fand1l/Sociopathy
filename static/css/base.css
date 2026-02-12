@@ -269,6 +269,7 @@ html, body {
     border-radius: 14px;
     padding: 10px;
     min-width: 190px;
+    width: max-content;
     display: flex;
     flex-direction: column;
     gap: 6px;
@@ -367,7 +368,7 @@ html, body {
 }
 
 .theme-switcher__button {
-    justify-content: flex-start;
+    justify-content: center;
 }
 
 .theme-switcher__button.is-active {
@@ -584,6 +585,7 @@ body::-webkit-scrollbar {
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+    justify-content: center;
 }
 .accent-dot {
     width: 20px;
