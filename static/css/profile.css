@@ -145,12 +145,22 @@
     font-weight: 600;
     cursor: pointer;
     text-decoration: none;
+    transition: transform 0.3s ease;
+}
+
+.profile__button:hover {
+    transform: scale(1.05);
 }
 
 .profile__button--ghost {
     background: transparent;
     color: var(--color-text-muted);
     border: 1px solid var(--button-ghost-border);
+    transition: transform 0.3s ease;
+}
+
+.profile__button--ghost:hover {
+    transform: scale(1.05);
 }
 
 .profile__button--follow {

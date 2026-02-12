@@ -67,7 +67,7 @@
 .feed__trigger {
     background-color: var(--sidebar-bg);
     padding: 15px;
-    border-radius: 15px;
+    border-radius: 40px;
     display: flex;
     align-items: center;
     gap: 15px;
@@ -75,7 +75,7 @@
     margin-bottom: 25px;
     transition: background-color 0.2s ease;
     border: 1px solid var(--color-border-strong);
-    max-width: 600px;
+    max-width: 700px;
     margin-left: auto;
     margin-right: auto;
 }
@@ -91,8 +91,6 @@
     border-radius: 50%;
 }
 
-
-
 .trigger__input {
     background-color: var(--main-bg);
     color: var(--inactive-color);
@@ -103,7 +101,7 @@
 }
 
 .feed-container {
-    max-width: 600px;
+    max-width: 700px;
     margin: 0 auto;
 }
 
@@ -119,8 +117,8 @@
 }
 .post-card {
     background-color: var(--content-bg);
-    border-radius: 20px;
-    padding: 20px;
+    border-radius: 30px;
+    padding: 25px 30px 25px 30px;
     margin-bottom: 20px;
     border: 1px solid var(--color-border);
     transition: transform 0.2s ease;
@@ -130,7 +128,7 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 15px;
+    margin-bottom: 25px;
 }
 
 .post-card__user {
@@ -159,7 +157,7 @@
 .post-card__content p {
     color: var(--color-text-secondary);
     line-height: 1.5;
-    margin-bottom: 15px;
+    margin-bottom: 30px;
     white-space: pre-wrap;
 }
 
@@ -167,13 +165,13 @@
     width: 100%;
     border-radius: 12px;
     display: block;
-    border: var(--color-border-strong) 1px solid;
+    border: var(--color-border-strong) 1.5px solid;
 }
 
 .post-card__footer {
     display: flex;
     gap: 10px;
-    margin-top: 15px;
+    margin-top: 30px;
     border-top: 1px solid var(--color-border);
     padding-top: 15px;
 }
