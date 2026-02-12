@@ -1,4 +1,5 @@
 from django.db import models
+from django.urls import reverse
 from django.contrib.auth.models import AbstractUser, Permission, Group
 from django.templatetags.static import static
 
@@ -88,6 +89,9 @@ class Profile(models.Model):
         if self.cover_image and hasattr(self.cover_image, "url"):
             return self.cover_image.url
         return static('assets/default_cover.jpg')
+    
+    def get_absolute_url(self):
+        return reverse('accounts:profile_detail', kwargs={'username': self.user.username})
     
     def __str__(self):
         return f"Profile of {self.user.username}"

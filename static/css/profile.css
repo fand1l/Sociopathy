@@ -5,7 +5,7 @@
     border: 1px solid var(--color-border);
     border-radius: 40px;
     padding: 24px;
-    color: var(--accent-color);
+    color: var(--color-text);
     box-shadow: 0 16px 50px var(--color-shadow-strong);
 }
 
@@ -54,6 +54,40 @@
     font-size: 1.5rem;
     font-weight: 600;
     margin-bottom: 6px;
+    color: var(--accent-color);
+}
+
+.profile__title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px; 
+}
+
+.profile__name {
+    margin: 0;
+    line-height: 1;
+}
+
+.copy-btn {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 20px !important;
+    background: none;
+    border: none;
+    transition: transform 0.3s ease, color 0.5s ease;
+}
+
+.copy-btn i {
+    color: var(--inactive-color);
+}
+
+.copy-btn:hover {
+    transform: scale(1.15);
+    cursor: pointer;
+}
+
+.copy-btn i:hover {
+    color: var(--accent-color);
 }
 
 .profile__meta {

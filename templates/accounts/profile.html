@@ -19,8 +19,18 @@
     </div>
     <div class="profile__header">
         <img src="{{ profile.avatar_url }}" alt="Аватар" class="profile__avatar">
-        <div>
-            <div class="profile__name">{{ profile.user.username }}</div>
+        <div class="profile__info">
+            <div class="profile__title-row">
+                <h1 class="profile__name">{{ profile.user.username }}</h1>
+                
+                <div class="copy-container">
+                    <input type="hidden" value="{{ request.scheme }}://{{ request.get_host }}{{ profile.get_absolute_url }}" id="myInput">
+                    <button class="copy-btn" onclick="copyToClipboard()" id="copyBtn">
+                        <i class="bx bx-link"></i>
+                    </button>
+                </div>
+            </div>
+
             <div class="profile__meta">@{{ profile.user.username }} · {{ profile.user.date_joined|date:"d M Y" }}</div>
         </div>
     </div>
@@ -73,4 +83,26 @@
         <a href="{% url 'posts:home' %}" class="profile__button">На стрічку</a>
     </div>
 </div>
+<script>
+    function copyToClipboard() {
+        const textToCopy = document.getElementById("myInput").value;
+        const btn = document.getElementById("copyBtn");
+
+        if (!navigator.clipboard) {
+            alert("Ваш браузер не підтримує копіювання");
+            return;
+        }
+
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="bx bx-check" style="color: #4CAF50;"></i>'; // Ставимо галочку
+            
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+            }, 2000);
+        }).catch(err => {
+            console.error('Помилка копіювання:', err);
+        });
+    }
+</script>
 {% endblock %}

@@ -37,7 +37,7 @@
                     <li class="menu__item new_post">
                         {% if user.is_authenticated %}
                             <a href="#" class="menu__link">
-                                <i class="bx bx-plus"></i>
+                                <i class="bx bx-plus rotating"></i>
                             </a>
                         {% else %}
                             <a href="{% url 'accounts:register' %}" class="menu__link">
@@ -87,7 +87,7 @@
             <div class="sidebar__settings menu__item--dropdown">
                 {% if user.is_authenticated %}
                     <button type="button" class="menu__link" title="Налаштування" aria-label="Налаштування">
-                        <i class="bx bx-cog"></i>
+                        <i class="bx bx-cog rotating"></i>
                     </button>
                     <div class="sidebar-dropdown" aria-label="Налаштування">
                         <div class="theme-switcher">
