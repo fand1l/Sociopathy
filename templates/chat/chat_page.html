@@ -66,17 +66,47 @@
                             <span class="chat-message__status">{% if message.read_at %}Прочитано{% endif %}</span>
                         {% endif %}
                     </div>
-                    <div class="chat-message__bubble">{{ message.text }}</div>
+                    <div class="chat-message__bubble">
+                        {% if message.text %}
+                            <p class="chat-message__text">{{ message.text }}</p>
+                        {% endif %}
+                        {% if message.image %}
+                            <a class="chat-message__image-link" href="{{ message.image.url }}" target="_blank" rel="noopener" aria-label="Відкрити зображення">
+                                <img class="chat-message__image" src="{{ message.image.url }}" alt="Зображення" loading="lazy" />
+                            </a>
+                        {% endif %}
+                        {% if message.file %}
+                            <a class="chat-message__file" href="{{ message.file.url }}" target="_blank" rel="noopener" aria-label="Відкрити файл">
+                                <svg viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M7 3h7l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm6 1.5V9h4.5L13 4.5z" />
+                                </svg>
+                            </a>
+                        {% endif %}
+                    </div>
                 </li>
             {% empty %}
                 <li class="chat-empty">Немає повідомлень. Напишіть першим!</li>
             {% endfor %}
         </ul>
 
-        <form id="chatForm" class="chat-form" autocomplete="off">
-            <input type="text" id="chatInput" placeholder="Напишіть повідомлення..." required>
+        <form id="chatForm" class="chat-form" autocomplete="off" method="post" enctype="multipart/form-data" action="{% url 'chat:chat_thread_send' thread.id %}">
+            {% csrf_token %}
+            <input type="text" id="chatInput" name="text" placeholder="Напишіть повідомлення...">
+            <label class="chat-form__file" for="chatImage" aria-label="Додати фото" title="Додати фото">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 5h4l1.5-2h5L16 5h4a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zm8 3.5A4.5 4.5 0 1 0 16.5 13 4.5 4.5 0 0 0 12 8.5z" />
+                </svg>
+                <input type="file" id="chatImage" name="image" accept="image/*">
+            </label>
+            <label class="chat-form__file" for="chatFile" aria-label="Додати файл" title="Додати файл">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M16.5 6.5 9 14a3 3 0 0 0 4.2 4.2l6.3-6.3a4.5 4.5 0 0 0-6.4-6.4L6.5 12.1" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" />
+                </svg>
+                <input type="file" id="chatFile" name="file">
+            </label>
             <button type="submit">Надіслати</button>
         </form>
+        <div id="chatAttachmentPreview" class="chat-attachments-preview" aria-live="polite"></div>
     </section>
     {% endif %}
 </div>
@@ -87,12 +117,14 @@
         const messagesEl = document.getElementById('chatMessages');
         const formEl = document.getElementById('chatForm');
         const inputEl = document.getElementById('chatInput');
-    const typingEl = document.getElementById('chatTyping');
+        const typingEl = document.getElementById('chatTyping');
+        const imageInput = document.getElementById('chatImage');
+        const fileInput = document.getElementById('chatFile');
+        const previewEl = document.getElementById('chatAttachmentPreview');
         const panelEl = document.querySelector('.chat-panel');
         if (!messagesEl || !formEl || !inputEl || !panelEl) return;
 
         const threadId = "{{ thread.id }}";
-        const username = "{{ request.user.username|escapejs }}";
         const currentUserId = Number(messagesEl.dataset.currentUserId);
         const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
         const socket = new WebSocket(`${scheme}://${window.location.host}/ws/chat/${threadId}/`);
@@ -113,6 +145,51 @@
             messagesEl.scrollTop = messagesEl.scrollHeight;
         };
 
+        const buildBubble = (payload) => {
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-message__bubble';
+
+            if (payload.message) {
+                const textEl = document.createElement('p');
+                textEl.className = 'chat-message__text';
+                textEl.textContent = payload.message;
+                bubble.appendChild(textEl);
+            }
+
+            if (payload.image_url) {
+                const link = document.createElement('a');
+                link.className = 'chat-message__image-link';
+                link.href = payload.image_url;
+                link.target = '_blank';
+                link.rel = 'noopener';
+
+                const image = document.createElement('img');
+                image.className = 'chat-message__image';
+                image.src = payload.image_url;
+                image.alt = 'Зображення';
+                image.loading = 'lazy';
+                link.appendChild(image);
+                bubble.appendChild(link);
+            }
+
+            if (payload.file_url) {
+                const fileLink = document.createElement('a');
+                fileLink.className = 'chat-message__file';
+                fileLink.href = payload.file_url;
+                fileLink.target = '_blank';
+                fileLink.rel = 'noopener';
+                fileLink.setAttribute('aria-label', payload.file_name || 'Файл');
+                fileLink.innerHTML = `
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M7 3h7l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm6 1.5V9h4.5L13 4.5z" />
+                    </svg>
+                `;
+                bubble.appendChild(fileLink);
+            }
+
+            return bubble;
+        };
+
         const appendMessage = (payload) => {
             const item = document.createElement('li');
             item.className = 'chat-message';
@@ -127,9 +204,8 @@
                     <time>${new Date(payload.created_at || Date.now()).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}</time>
                     ${payload.sender_id === currentUserId ? '<span class="chat-message__status"></span>' : ''}
                 </div>
-                <div class="chat-message__bubble"></div>
             `;
-            item.querySelector('.chat-message__bubble').textContent = payload.message;
+            item.appendChild(buildBubble(payload));
             messagesEl.appendChild(item);
             scrollToBottom();
             maybeSendReadReceipt();
@@ -179,19 +255,113 @@
             }
         };
 
-        formEl.addEventListener('submit', (event) => {
+        formEl.addEventListener('submit', async (event) => {
             event.preventDefault();
-            const message = inputEl.value.trim();
-            if (!message) return;
-            socket.send(JSON.stringify({ message }));
+            const hasText = inputEl.value.trim();
+            const hasImage = imageInput && imageInput.files && imageInput.files.length > 0;
+            const hasFile = fileInput && fileInput.files && fileInput.files.length > 0;
+            if (!hasText && !hasImage && !hasFile) return;
+
+            const formData = new FormData(formEl);
+            const response = await fetch(formEl.action, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin',
+            });
+
+            if (!response.ok) {
+                const errorPayload = await response.json().catch(() => null);
+                console.error('Chat upload failed', errorPayload);
+                return;
+            }
+
             inputEl.value = '';
+            if (imageInput) imageInput.value = '';
+            if (fileInput) fileInput.value = '';
+            if (previewEl) previewEl.innerHTML = '';
         });
+
+        const renderAttachmentPreview = () => {
+            if (!previewEl) return;
+            previewEl.innerHTML = '';
+
+            if (imageInput && imageInput.files && imageInput.files[0]) {
+                const imageFile = imageInput.files[0];
+                const imageUrl = URL.createObjectURL(imageFile);
+                const imageWrap = document.createElement('div');
+                imageWrap.className = 'chat-attachments-preview__item';
+                imageWrap.dataset.type = 'image';
+
+                const image = document.createElement('img');
+                image.className = 'chat-attachments-preview__image';
+                image.src = imageUrl;
+                image.alt = 'Превью фото';
+                image.onload = () => URL.revokeObjectURL(imageUrl);
+
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'chat-attachments-preview__remove';
+                removeBtn.setAttribute('aria-label', 'Прибрати фото');
+                removeBtn.innerHTML = '&times;';
+
+                imageWrap.appendChild(image);
+                imageWrap.appendChild(removeBtn);
+                previewEl.appendChild(imageWrap);
+            }
+
+            if (fileInput && fileInput.files && fileInput.files[0]) {
+                const fileWrap = document.createElement('div');
+                fileWrap.className = 'chat-attachments-preview__item';
+                fileWrap.dataset.type = 'file';
+
+                const fileCard = document.createElement('div');
+                fileCard.className = 'chat-attachments-preview__file';
+                fileCard.innerHTML = `
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M7 3h7l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm6 1.5V9h4.5L13 4.5z" />
+                    </svg>
+                `;
+
+                const removeBtn = document.createElement('button');
+                removeBtn.type = 'button';
+                removeBtn.className = 'chat-attachments-preview__remove';
+                removeBtn.setAttribute('aria-label', 'Прибрати файл');
+                removeBtn.innerHTML = '&times;';
+
+                fileWrap.appendChild(fileCard);
+                fileWrap.appendChild(removeBtn);
+                previewEl.appendChild(fileWrap);
+            }
+        };
+
+        const clearAttachment = (type) => {
+            if (type === 'image' && imageInput) {
+                imageInput.value = '';
+            }
+            if (type === 'file' && fileInput) {
+                fileInput.value = '';
+            }
+            renderAttachmentPreview();
+        };
 
         inputEl.addEventListener('input', () => {
             if (typingTimeout) clearTimeout(typingTimeout);
             sendTyping(true);
             typingTimeout = setTimeout(() => sendTyping(false), 1200);
         });
+
+        if (imageInput) imageInput.addEventListener('change', renderAttachmentPreview);
+        if (fileInput) fileInput.addEventListener('change', renderAttachmentPreview);
+        if (previewEl) {
+            previewEl.addEventListener('click', (event) => {
+                const target = event.target;
+                if (!(target instanceof HTMLElement)) return;
+                if (!target.classList.contains('chat-attachments-preview__remove')) return;
+                const wrap = target.closest('.chat-attachments-preview__item');
+                if (!wrap) return;
+                clearAttachment(wrap.dataset.type);
+            });
+        }
 
         inputEl.addEventListener('blur', () => sendTyping(false));
         messagesEl.addEventListener('scroll', maybeSendReadReceipt);

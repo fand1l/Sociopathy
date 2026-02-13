@@ -3,7 +3,11 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.db.models import Max
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 from relationships.models import Follow
 from .forms import ChatMessageForm
@@ -125,3 +129,38 @@ def start_private_chat(request, username):
         thread.participants.add(request.user, other_user)
 
     return redirect("chat:chat_thread_detail", thread_id=thread.id)
+
+
+@login_required
+def send_message(request, thread_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "Метод не підтримується."}, status=405)
+
+    thread = get_object_or_404(ChatThread, id=thread_id, participants=request.user)
+    form = ChatMessageForm(request.POST, request.FILES)
+    if not form.is_valid():
+        return JsonResponse({"error": form.errors.get("__all__", form.errors)}, status=400)
+
+    message = form.save(commit=False)
+    message.thread = thread
+    message.sender = request.user
+    message.save()
+    thread.save(update_fields=["updated_at"])
+
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"chat_{thread.id}",
+        {
+            "type": "chat_message",
+            "message": message.text or "",
+            "username": request.user.username,
+            "sender_id": request.user.id,
+            "message_id": message.id,
+            "created_at": message.created_at.isoformat(),
+            "image_url": message.image.url if message.image else None,
+            "file_url": message.file.url if message.file else None,
+            "file_name": message.file.name.split("/")[-1] if message.file else None,
+        },
+    )
+
+    return JsonResponse({"status": "ok", "message_id": message.id})
