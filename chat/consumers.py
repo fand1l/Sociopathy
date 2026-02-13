@@ -106,6 +106,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "sender_id": self.user.id,
                 "message_id": message.id,
                 "created_at": message.created_at.isoformat(),
+                "image_url": message.image.url if message.image else None,
+                "file_url": message.file.url if message.file else None,
+                "file_name": message.file.name.split("/")[-1] if message.file else None,
             },
         )
 
@@ -169,6 +172,9 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "sender_id": event["sender_id"],
                     "message_id": event["message_id"],
                     "created_at": event["created_at"],
+                    "image_url": event.get("image_url"),
+                    "file_url": event.get("file_url"),
+                    "file_name": event.get("file_name"),
                 }
             )
         )
