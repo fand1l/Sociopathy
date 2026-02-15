@@ -40,7 +40,7 @@
                     </li>
                     <li class="menu__item new_post">
                         {% if user.is_authenticated %}
-                            <a href="#" class="menu__link">
+                            <a href="{% url 'posts:home' %}?new_post=1" class="menu__link">
                                 <i class="bx bx-plus rotating"></i>
                             </a>
                         {% else %}

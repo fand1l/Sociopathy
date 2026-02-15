@@ -5,11 +5,14 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
+from django.db.models import Exists, OuterRef
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from .forms import RegisterForm, ProfileForm
 from .models import Profile
 from likes.models import Like
+from bookmarks.models import Bookmark
+from posts.models import Post
 
 User = get_user_model()
 
@@ -81,6 +84,19 @@ def username_check(request):
 def profile_view(request):
 	profile, _ = Profile.objects.get_or_create(user=request.user)
 	total_likes = Like.objects.filter(post__author=profile.user).count()
+	posts = (
+		Post.objects.filter(author=profile.user, parent_post__isnull=True)
+		.select_related("author", "author__profile")
+		.annotate(
+			is_liked=Exists(
+				Like.objects.filter(user=request.user, post=OuterRef("pk"))
+			),
+			is_bookmarked=Exists(
+				Bookmark.objects.filter(user=request.user, post=OuterRef("pk"))
+			),
+		)
+		.order_by("-created_at")
+	)
 	return render(
 		request,
 		"accounts/profile.html",
@@ -89,6 +105,7 @@ def profile_view(request):
 			"is_owner": True,
 			"follow_state": None,
 			"total_likes": total_likes,
+			"posts": posts,
 		},
 	)
 
@@ -99,6 +116,19 @@ def profile_detail_view(request, username):
 	profile, _ = Profile.objects.get_or_create(user=user)
 	viewer_profile, _ = Profile.objects.get_or_create(user=request.user)
 	total_likes = Like.objects.filter(post__author=profile.user).count()
+	posts = (
+		Post.objects.filter(author=profile.user, parent_post__isnull=True)
+		.select_related("author", "author__profile")
+		.annotate(
+			is_liked=Exists(
+				Like.objects.filter(user=request.user, post=OuterRef("pk"))
+			),
+			is_bookmarked=Exists(
+				Bookmark.objects.filter(user=request.user, post=OuterRef("pk"))
+			),
+		)
+		.order_by("-created_at")
+	)
 
 	following = profile.followers.filter(pk=viewer_profile.pk).exists()
 	followed_by = profile.following.filter(pk=viewer_profile.pk).exists()
@@ -120,6 +150,7 @@ def profile_detail_view(request, username):
 			"is_owner": user == request.user,
 			"follow_state": follow_state,
 			"total_likes": total_likes,
+			"posts": posts,
 		},
 	)
 

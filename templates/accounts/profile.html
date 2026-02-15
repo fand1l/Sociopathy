@@ -4,83 +4,146 @@
 {% block title %}Мій профіль{% endblock %}
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'css/profile.css' %}">
+<link rel="stylesheet" href="{% static 'css/feed.css' %}">
 {% endblock %}
 
 {% block header_title %}Профіль{% endblock %}
 
 {% block content %}
-<div class="profile">
-    <div class="profile__cover">
-        {% if profile.cover_url %}
-            <img src="{{ profile.cover_url }}" alt="Обкладинка" class="profile__cover-image">
-        {% else %}
-            <div class="profile__cover-placeholder">Обкладинка 970×250</div>
-        {% endif %}
-    </div>
-    <div class="profile__header">
-        <img src="{{ profile.avatar_url }}" alt="Аватар" class="profile__avatar">
-        <div class="profile__info">
-            <div class="profile__title-row">
-                <h1 class="profile__name">{{ profile.user.username }}</h1>
-                
-                <div class="copy-container">
-                    <input type="hidden" value="{{ request.scheme }}://{{ request.get_host }}{{ profile.get_absolute_url }}" id="myInput">
-                    <button class="copy-btn" onclick="copyToClipboard()" id="copyBtn">
-                        <i class="bx bx-link"></i>
-                    </button>
+<div class="feed-container">
+    <div class="profile">
+        <div class="profile__cover">
+            {% if profile.cover_url %}
+                <img src="{{ profile.cover_url }}" alt="Обкладинка" class="profile__cover-image">
+            {% else %}
+                <div class="profile__cover-placeholder">Обкладинка 970×250</div>
+            {% endif %}
+        </div>
+        <div class="profile__header">
+            <img src="{{ profile.avatar_url }}" alt="Аватар" class="profile__avatar">
+            <div class="profile__info">
+                <div class="profile__title-row">
+                    <h1 class="profile__name">{{ profile.user.username }}</h1>
+                    
+                    <div class="copy-container">
+                        <input type="hidden" value="{{ request.scheme }}://{{ request.get_host }}{{ profile.get_absolute_url }}" id="myInput">
+                        <button class="copy-btn" onclick="copyToClipboard()" id="copyBtn">
+                            <i class="bx bx-link"></i>
+                        </button>
+                    </div>
                 </div>
+
+                <div class="profile__meta">@{{ profile.user.username }} · {{ profile.user.date_joined|date:"d M Y" }}</div>
             </div>
+        </div>
 
-            <div class="profile__meta">@{{ profile.user.username }} · {{ profile.user.date_joined|date:"d M Y" }}</div>
+        <div class="profile__bio">
+            {% if profile.bio %}
+                {{ profile.bio }}
+            {% else %}
+                Тут поки що порожньо. Додайте кілька слів про себе.
+            {% endif %}
+        </div>
+
+        <div class="profile__stats">
+            <div class="profile__stat">
+                <span>{{ profile.followers.count }}</span>
+                <small>Підписників</small>
+            </div>
+            <div class="profile__stat">
+                <span>{{ profile.following.count }}</span>
+                <small>Підписок</small>
+            </div>
+            <div class="profile__stat">
+                <span>{{ total_likes }}</span>
+                <small>Вподобань</small>
+            </div>
+        </div>
+
+        <div class="profile__actions">
+            {% if is_owner %}
+                <a href="{% url 'accounts:profile_edit' %}" class="profile__button profile__button--ghost">Редагувати профіль</a>
+            {% else %}
+                <form method="POST" action="{% url 'relationships:follow_toggle' profile.user.username %}">
+                    {% csrf_token %}
+                    <button type="submit" class="profile__button profile__button--ghost profile__button--follow">
+                        {% if follow_state == 'friends' %}
+                            Друзі
+                        {% elif follow_state == 'mutual' %}
+                            Взаємно слідкувати
+                        {% elif follow_state == 'following' %}
+                            Слідкую
+                        {% else %}
+                            Слідкувати
+                        {% endif %}
+                    </button>
+                </form>
+                <a href="{% url 'chat:start_private_chat' profile.user.username %}" class="profile__button">
+                    Написати
+                </a>
+            {% endif %}
+            <a href="{% url 'posts:home' %}" class="profile__button">На стрічку</a>
         </div>
     </div>
 
-    <div class="profile__bio">
-        {% if profile.bio %}
-            {{ profile.bio }}
-        {% else %}
-            Тут поки що порожньо. Додайте кілька слів про себе.
-        {% endif %}
-    </div>
+    <div class="posts-list">
+        {% for post in posts %}
+            <article class="post-card">
+                <div class="post-card__header">
+                    <div class="post-card__user">
+                        <div class="avatar-wrapper">
+                            <a href="{% url 'accounts:profile_detail' post.author.username %}">
+                                <img src="{{ post.author.profile.avatar_url }}" alt="{{ post.author.username }}" class="user-avatar user-avatar--small">
+                            </a>
+                        </div>
+                        <div class="user-info">
+                            <a href="{% url 'accounts:profile_detail' post.author.username %}" class="user-info__name">
+                                {{ post.author.username }}
+                            </a>
+                            <span class="user-info__date">{{ post.created_at|date:"d M H:i" }}</span>
+                        </div>
+                    </div>
 
-    <div class="profile__stats">
-        <div class="profile__stat">
-            <span>{{ profile.followers.count }}</span>
-            <small>Підписників</small>
-        </div>
-        <div class="profile__stat">
-            <span>{{ profile.following.count }}</span>
-            <small>Підписок</small>
-        </div>
-        <div class="profile__stat">
-            <span>{{ total_likes }}</span>
-            <small>Вподобань</small>
-        </div>
-    </div>
-
-    <div class="profile__actions">
-        {% if is_owner %}
-            <a href="{% url 'accounts:profile_edit' %}" class="profile__button profile__button--ghost">Редагувати профіль</a>
-        {% else %}
-            <form method="POST" action="{% url 'relationships:follow_toggle' profile.user.username %}">
-                {% csrf_token %}
-                <button type="submit" class="profile__button profile__button--ghost profile__button--follow">
-                    {% if follow_state == 'friends' %}
-                        Друзі
-                    {% elif follow_state == 'mutual' %}
-                        Взаємно слідкувати
-                    {% elif follow_state == 'following' %}
-                        Слідкую
-                    {% else %}
-                        Слідкувати
+                    {% if post.author == user %}
+                    <div class="post-card__manage">
+                        <a href="{% url 'posts:post_update' post.pk %}" class="manage-link"><i class='bx bx-edit-alt'></i></a>
+                        <a href="{% url 'posts:post_delete' post.pk %}" class="manage-link manage-link--delete"><i class='bx bx-trash'></i></a>
+                    </div>
                     {% endif %}
-                </button>
-            </form>
-            <a href="{% url 'chat:start_private_chat' profile.user.username %}" class="profile__button">
-                Написати
-            </a>
-        {% endif %}
-        <a href="{% url 'posts:home' %}" class="profile__button">На стрічку</a>
+                </div>
+
+                <div class="post-card__content">
+                    <p>{{ post.content }}</p>
+                    {% if post.image %}
+                        <div class="post-card__image">
+                            <img src="{{ post.image.url }}" alt="Post image">
+                        </div>
+                    {% endif %}
+                </div>
+
+                <div class="post-card__footer">
+                    <form action="{% url 'likes:like_post' post.pk %}" method="POST" class="like-form">
+                        {% csrf_token %}
+                        <button type="submit" class="action-btn {% if post.is_liked %}active{% endif %}">
+                            <i class='{% if post.is_liked %}bxf{% else %}bx{% endif %} bx-heart'></i>
+                            <span>{{ post.likes.count }}</span>
+                        </button>
+                    </form>
+                    <a href="{% url 'posts:post_detail' post.pk %}" class="action-btn">
+                        <i class="bx bx-message-circle"></i>
+                        <span>{{ post.replies.count }}</span>
+                    </a>
+                    <form action="{% url 'bookmarks:toggle' post.pk %}" method="POST" class="bookmark-form">
+                        {% csrf_token %}
+                        <button type="submit" class="action-btn {% if post.is_bookmarked %}active{% endif %}">
+                            <i class='{% if post.is_bookmarked %}bxf{% else %}bx{% endif %} bx-bookmark'></i>
+                        </button>
+                    </form>
+                </div>
+            </article>
+        {% empty %}
+            <div class="empty-feed"><i class="bx bx-leaf-alt"></i><br><br>Постів поки що немає.</div>
+        {% endfor %}
     </div>
 </div>
 <script>
