@@ -1,5 +1,6 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.views.generic import ListView
+from django.core.paginator import Paginator
 from django.urls import reverse_lazy
 from .models import Post
 from likes.models import Like
@@ -10,6 +11,41 @@ from django.views.generic import UpdateView, DeleteView
 from .forms import PostForm
 from django.conf import settings
 from accounts.models import Profile
+
+
+def build_comment_tree(root_comments):
+    if not root_comments:
+        return []
+
+    children_by_parent = {}
+    pending_parent_ids = [comment.id for comment in root_comments]
+    seen_ids = set(pending_parent_ids)
+
+    while pending_parent_ids:
+        batch = list(
+            Post.objects.filter(parent_post_id__in=pending_parent_ids)
+            .select_related("author", "author__profile")
+            .order_by("created_at")
+        )
+
+        if not batch:
+            break
+
+        pending_parent_ids = []
+        for comment in batch:
+            if comment.id in seen_ids:
+                continue
+            seen_ids.add(comment.id)
+            children_by_parent.setdefault(comment.parent_post_id, []).append(comment)
+            pending_parent_ids.append(comment.id)
+
+    def build(comment):
+        return {
+            "comment": comment,
+            "children": [build(child) for child in children_by_parent.get(comment.id, [])],
+        }
+
+    return [build(comment) for comment in root_comments]
 
 class FeedView(ListView):
     model = Post
@@ -94,3 +130,56 @@ class PostDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     def test_func(self):
         post = self.get_object()
         return self.request.user == post.author
+
+
+def post_detail(request, pk):
+    post_queryset = Post.objects.select_related("author", "author__profile")
+    if request.user.is_authenticated:
+        post_queryset = post_queryset.annotate(
+            is_liked=Exists(
+                Like.objects.filter(user=request.user, post=OuterRef("pk"))
+            ),
+            is_bookmarked=Exists(
+                Bookmark.objects.filter(user=request.user, post=OuterRef("pk"))
+            ),
+        )
+
+    post = get_object_or_404(post_queryset, pk=pk)
+    if not request.user.is_authenticated:
+        post.is_liked = False
+        post.is_bookmarked = False
+
+    if request.method == "POST":
+        if not request.user.is_authenticated:
+            return redirect(f"{settings.LOGIN_URL}?next={request.path}")
+
+        form = PostForm(request.POST, request.FILES)
+        if form.is_valid():
+            comment = form.save(commit=False)
+            comment.author = request.user
+            comment.parent_post = post
+            comment.save()
+            return redirect("posts:post_detail", pk=post.pk)
+    else:
+        form = PostForm()
+
+    top_level_comments = (
+        Post.objects.filter(parent_post=post)
+        .select_related("author", "author__profile")
+        .order_by("created_at")
+    )
+
+    paginator = Paginator(top_level_comments, 10)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    comment_tree = build_comment_tree(list(page_obj.object_list))
+
+    return render(
+        request,
+        "posts/post_detail.html",
+        {
+            "post": post,
+            "comment_tree": comment_tree,
+            "form": form,
+            "page_obj": page_obj,
+        },
+    )

@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Пост{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/feed.css' %}">
+<link rel="stylesheet" href="{% static 'css/post_detail.css' %}">
+{% endblock %}
+
+{% block header_title %}Пост{% endblock %}
+
+{% block content %}
+<div class="post-detail">
+    <div class="post-detail__nav">
+        <a href="{% url 'posts:home' %}" class="back-link">
+            <i class="bx bx-arrow-back"></i>
+            Повернутися до стрічки
+        </a>
+    </div>
+
+    <article class="post-card">
+        <div class="post-card__header">
+            <div class="post-card__user">
+                <div class="avatar-wrapper">
+                    <a href="{% url 'accounts:profile_detail' post.author.username %}">
+                        <img src="{{ post.author.profile.avatar_url }}" alt="{{ post.author.username }}" class="user-avatar user-avatar--small">
+                    </a>
+                </div>
+                <div class="user-info">
+                    <a href="{% url 'accounts:profile_detail' post.author.username %}" class="user-info__name">
+                        {{ post.author.username }}
+                    </a>
+                    <span class="user-info__date">{{ post.created_at|date:"d M H:i" }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="post-card__content">
+            <p>{{ post.content }}</p>
+            {% if post.image %}
+                <div class="post-card__image">
+                    <img src="{{ post.image.url }}" alt="Post image">
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="post-card__footer">
+            <form action="{% url 'likes:like_post' post.pk %}" method="POST" class="like-form">
+                {% csrf_token %}
+                <button type="submit" class="action-btn {% if post.is_liked %}active{% endif %}">
+                    <i class='{% if post.is_liked %}bxf{% else %}bx{% endif %} bx-heart'></i>
+                    <span>{{ post.likes.count }}</span>
+                </button>
+            </form>
+            <button type="button" class="action-btn">
+                <i class="bx bx-message-circle"></i>
+                <span>{{ post.replies.count }}</span>
+            </button>
+            <form action="{% url 'bookmarks:toggle' post.pk %}" method="POST" class="bookmark-form">
+                {% csrf_token %}
+                <button type="submit" class="action-btn {% if post.is_bookmarked %}active{% endif %}">
+                    <i class='{% if post.is_bookmarked %}bxf{% else %}bx{% endif %} bx-bookmark'></i>
+                </button>
+            </form>
+        </div>
+    </article>
+
+    <section class="comments">
+        <h2 class="comments__title">Коментарі</h2>
+        <div class="comment-form">
+            {% if user.is_authenticated %}
+                <form method="POST" action="{% url 'posts:post_detail' post.pk %}" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    {{ form.content }}
+                    {% if form.content.errors %}
+                        <div class="comment-form__errors">{{ form.content.errors }}</div>
+                    {% endif %}
+
+                    <div class="modal__upload">
+                        <label for="file-upload" class="custom-file-upload">
+                            <i class="bx bx-image-add"></i> Додати фото
+                        </label>
+                        {{ form.image }}
+                    </div>
+                    {% if form.image.errors %}
+                        <div class="comment-form__errors">{{ form.image.errors }}</div>
+                    {% endif %}
+
+                    <div class="comment-form__actions">
+                        <button type="submit" class="modal__button">Опублікувати</button>
+                    </div>
+                </form>
+            {% else %}
+                <p class="comment-form__hint">
+                    Щоб залишити коментар, увійдіть до системи.
+                    <a href="{% url 'accounts:login' %}">Увійти</a>
+                </p>
+            {% endif %}
+        </div>
+
+        {% if comment_tree %}
+            {% include 'posts/_comment_tree.html' with comment_tree=comment_tree %}
+        {% else %}
+            <p class="comments__empty">Коментарів ще немає.</p>
+        {% endif %}
+
+        {% if page_obj and page_obj.paginator.num_pages > 1 %}
+            <nav class="pagination" aria-label="Коментарі: сторінки">
+                {% if page_obj.has_previous %}
+                    <a class="pagination__link" href="?page={{ page_obj.previous_page_number }}">Назад</a>
+                {% else %}
+                    <span class="pagination__link pagination__link--disabled">Назад</span>
+                {% endif %}
+
+                <span class="pagination__current">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+
+                {% if page_obj.has_next %}
+                    <a class="pagination__link" href="?page={{ page_obj.next_page_number }}">Далі</a>
+                {% else %}
+                    <span class="pagination__link pagination__link--disabled">Далі</span>
+                {% endif %}
+            </nav>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

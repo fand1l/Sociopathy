@@ -1,0 +1,33 @@
+<ul class="comment-tree">
+    {% for node in comment_tree %}
+        <li class="comment-node">
+            <article class="comment-card">
+                <div class="comment-card__header">
+                    <div class="comment-card__user">
+                        <a href="{% url 'accounts:profile_detail' node.comment.author.username %}">
+                            <img src="{{ node.comment.author.profile.avatar_url }}" alt="{{ node.comment.author.username }}" class="user-avatar user-avatar--small">
+                        </a>
+                        <div class="user-info">
+                            <a href="{% url 'accounts:profile_detail' node.comment.author.username %}" class="user-info__name">
+                                {{ node.comment.author.username }}
+                            </a>
+                            <span class="user-info__date">{{ node.comment.created_at|date:"d M H:i" }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="comment-card__content">
+                    <p>{{ node.comment.content }}</p>
+                    {% if node.comment.image %}
+                        <div class="comment-card__image">
+                            <img src="{{ node.comment.image.url }}" alt="Comment image">
+                        </div>
+                    {% endif %}
+                </div>
+            </article>
+
+            {% if node.children %}
+                {% include 'posts/_comment_tree.html' with comment_tree=node.children %}
+            {% endif %}
+        </li>
+    {% endfor %}
+</ul>

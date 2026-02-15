@@ -85,10 +85,10 @@
                             <span>{{ post.likes.count }}</span>
                         </button>
                     </form>
-                    <button type="button" class="action-btn">
+                    <a href="{% url 'posts:post_detail' post.pk %}" class="action-btn">
                         <i class="bx bx-message-circle"></i>
-                        <span>0</span>
-                    </button>
+                        <span>{{ post.replies.count }}</span>
+                    </a>
                     <form action="{% url 'bookmarks:toggle' post.pk %}" method="POST" class="bookmark-form">
                         {% csrf_token %}
                         <button type="submit" class="action-btn {% if post.is_bookmarked %}active{% endif %}">
@@ -105,14 +105,15 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
     const modal = document.getElementById("postModal");
-    const sidebarBtn = document.querySelector(".new_post");
+    const sidebarBtn = document.querySelector(".new_post .menu__link");
     const feedBtn = document.getElementById("feedTrigger");
     const isAuthenticated = "{{ user.is_authenticated|yesno:'true,false' }}" === "true";
     const registerUrl = "{% url 'accounts:register' %}";
+    const shouldOpenFromQuery = new URLSearchParams(window.location.search).get("new_post") === "1";
         const span = document.querySelector(".modal__close");
 
-        const openModal = (e) => {
-            e.preventDefault();
+        const openModal = (event) => {
+            if (event) event.preventDefault();
             if (!isAuthenticated) {
                 window.location.href = registerUrl;
                 return;
@@ -122,6 +123,13 @@
 
         if (sidebarBtn) sidebarBtn.onclick = openModal;
         if (feedBtn) feedBtn.onclick = openModal;
+
+        if (shouldOpenFromQuery) {
+            openModal();
+            const url = new URL(window.location.href);
+            url.searchParams.delete("new_post");
+            window.history.replaceState({}, "", url.toString());
+        }
 
         span.onclick = () => modal.style.display = "none";
         window.onclick = (event) => {
