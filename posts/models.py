@@ -33,6 +33,14 @@ class Post(models.Model):
         related_name='replies'
     )
 
+    reposted_post = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="reposts",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def update_score(self):

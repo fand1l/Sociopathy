@@ -1,13 +1,13 @@
 .modal {
     display: none; 
     position: fixed;
-    z-index: 2000; /* Має бути вище за сайдбар */
+    z-index: 2000;
     left: 0;
     top: 0;
     width: 100%;
     height: 100%;
-    background-color: var(--color-overlay-strong); /* Напівпрозорий чорний */
-    backdrop-filter: blur(4px); /* Ефект розмиття фону */
+    background-color: var(--color-overlay-strong);
+    backdrop-filter: blur(4px);
 }
 
 /* Контентне вікно */
@@ -229,7 +229,6 @@
     border-radius: 20px;
 }
 
-/* Edit popup UX */
 .modal--edit {
     display: block;
 }

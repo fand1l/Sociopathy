@@ -7,6 +7,8 @@ from likes.models import Like
 from bookmarks.models import Bookmark
 from django.db.models import Case, Exists, OuterRef, Value, When, IntegerField, F
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from django.views.generic import UpdateView, DeleteView
 from .forms import PostForm
 from django.conf import settings
@@ -55,7 +57,13 @@ class FeedView(ListView):
 
     def get_queryset(self):
         queryset = Post.objects.all()
-        queryset = queryset.select_related("author", "author__profile")
+        queryset = queryset.select_related(
+            "author",
+            "author__profile",
+            "reposted_post",
+            "reposted_post__author",
+            "reposted_post__author__profile",
+        )
 
         if self.request.user.is_authenticated:
             profile, _ = Profile.objects.get_or_create(user=self.request.user)
@@ -133,7 +141,13 @@ class PostDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 
 
 def post_detail(request, pk):
-    post_queryset = Post.objects.select_related("author", "author__profile")
+    post_queryset = Post.objects.select_related(
+        "author",
+        "author__profile",
+        "reposted_post",
+        "reposted_post__author",
+        "reposted_post__author__profile",
+    )
     if request.user.is_authenticated:
         post_queryset = post_queryset.annotate(
             is_liked=Exists(
@@ -183,3 +197,29 @@ def post_detail(request, pk):
             "page_obj": page_obj,
         },
     )
+
+
+@login_required
+@require_POST
+def repost_post(request, pk):
+    original_post = get_object_or_404(
+        Post.objects.select_related("author", "author__profile"),
+        pk=pk,
+    )
+
+    if original_post.parent_post_id:
+        next_url = request.POST.get("next") or request.META.get("HTTP_REFERER")
+        return redirect(next_url or "posts:home")
+
+    if original_post.reposted_post_id:
+        original_post = original_post.reposted_post
+
+    Post.objects.create(
+        author=request.user,
+        content=original_post.content,
+        image=original_post.image,
+        reposted_post=original_post,
+    )
+
+    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER")
+    return redirect(next_url or "posts:home")

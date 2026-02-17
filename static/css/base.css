@@ -81,7 +81,7 @@
     --sidebar-bg: var(--color-surface-2);
 }
 
-/* Колірна схема браузера для світлої теми */
+
 [data-theme="light"], [data-theme="light"] * {
     color-scheme: light;
 }
@@ -92,7 +92,7 @@
 [data-accent="pink"] { --accent-color: #ec4899; }
 [data-accent="orange"] { --accent-color: #f97316; }
 
-/* Важливо: оновлюємо використання акценту для лінків та іконок */
+
 [data-accent] .menu__link--active, 
 [data-accent] .menu__link:hover {
     color: var(--accent-color) !important;
