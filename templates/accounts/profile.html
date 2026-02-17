@@ -113,8 +113,20 @@
                 </div>
 
                 <div class="post-card__content">
-                    <p>{{ post.content }}</p>
-                    {% if post.image %}
+                    {% if post.reposted_post %}
+                        <div class="post-card__repost">
+                            Репост від
+                            <a href="{% url 'accounts:profile_detail' post.reposted_post.author.username %}">
+                                {{ post.reposted_post.author.username }}
+                            </a>
+                        </div>
+                    {% endif %}
+                    <p>{% if post.reposted_post %}{{ post.reposted_post.content }}{% else %}{{ post.content }}{% endif %}</p>
+                    {% if post.reposted_post and post.reposted_post.image %}
+                        <div class="post-card__image">
+                            <img src="{{ post.reposted_post.image.url }}" alt="Post image">
+                        </div>
+                    {% elif post.image %}
                         <div class="post-card__image">
                             <img src="{{ post.image.url }}" alt="Post image">
                         </div>
@@ -133,6 +145,13 @@
                         <i class="bx bx-message-circle"></i>
                         <span>{{ post.replies.count }}</span>
                     </a>
+                    <form action="{% url 'posts:post_repost' post.pk %}" method="POST" class="repost-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" class="action-btn">
+                            <i class="bx bx-repeat"></i>
+                        </button>
+                    </form>
                     <form action="{% url 'bookmarks:toggle' post.pk %}" method="POST" class="bookmark-form">
                         {% csrf_token %}
                         <button type="submit" class="action-btn {% if post.is_bookmarked %}active{% endif %}">

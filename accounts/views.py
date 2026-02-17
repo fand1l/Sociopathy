@@ -86,7 +86,13 @@ def profile_view(request):
 	total_likes = Like.objects.filter(post__author=profile.user).count()
 	posts = (
 		Post.objects.filter(author=profile.user, parent_post__isnull=True)
-		.select_related("author", "author__profile")
+		.select_related(
+			"author",
+			"author__profile",
+			"reposted_post",
+			"reposted_post__author",
+			"reposted_post__author__profile",
+		)
 		.annotate(
 			is_liked=Exists(
 				Like.objects.filter(user=request.user, post=OuterRef("pk"))
@@ -118,7 +124,13 @@ def profile_detail_view(request, username):
 	total_likes = Like.objects.filter(post__author=profile.user).count()
 	posts = (
 		Post.objects.filter(author=profile.user, parent_post__isnull=True)
-		.select_related("author", "author__profile")
+		.select_related(
+			"author",
+			"author__profile",
+			"reposted_post",
+			"reposted_post__author",
+			"reposted_post__author__profile",
+		)
 		.annotate(
 			is_liked=Exists(
 				Like.objects.filter(user=request.user, post=OuterRef("pk"))
