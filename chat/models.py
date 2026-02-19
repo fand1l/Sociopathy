@@ -41,6 +41,8 @@ class ChatMessage(models.Model):
         null=True,
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    edited_at = models.DateTimeField(blank=True, null=True)
+    deleted_at = models.DateTimeField(blank=True, null=True)
     read_at = models.DateTimeField(blank=True, null=True)
     read_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -62,3 +64,29 @@ class ChatMessage(models.Model):
         if self.file:
             return f"File: {self.file.name.split('/')[-1]}"
         return "Message"
+
+
+class ChatReaction(models.Model):
+    message = models.ForeignKey(
+        ChatMessage,
+        on_delete=models.CASCADE,
+        related_name="reactions",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="chat_reactions",
+    )
+    emoji = models.CharField(max_length=12)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["message", "user", "emoji"],
+                name="unique_chat_reaction",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user_id}:{self.emoji} on {self.message_id}"

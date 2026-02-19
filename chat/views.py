@@ -1,9 +1,12 @@
+import json
+
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
-from django.db.models import Max
+from django.db.models import Count, Max
 from django.http import JsonResponse
+from django.utils import timezone
 from django.shortcuts import get_object_or_404, redirect, render
 
 from asgiref.sync import async_to_sync
@@ -11,7 +14,7 @@ from channels.layers import get_channel_layer
 
 from relationships.models import Follow
 from .forms import ChatMessageForm
-from .models import ChatThread
+from .models import ChatMessage, ChatReaction, ChatThread
 
 User = get_user_model()
 
@@ -66,12 +69,32 @@ def thread_list(request):
 @login_required
 def chat_page(request, thread_id):
     thread = get_object_or_404(ChatThread, id=thread_id, participants=request.user)
-    chat_messages = thread.messages.all().order_by("created_at")
+    chat_messages = list(thread.messages.all().order_by("created_at"))
     other_user = thread.participants.exclude(id=request.user.id).first()
     request_profile = getattr(request.user, "profile", None)
     other_profile = getattr(other_user, "profile", None) if other_user else None
     is_friend = _are_friends(request_profile, other_profile)
     is_online = bool(other_user) and is_friend and _is_user_online(other_user.id)
+
+    reactions = (
+        ChatReaction.objects.filter(message__thread=thread)
+        .values("message_id", "emoji")
+        .annotate(count=Count("id"))
+    )
+    user_reactions = (
+        ChatReaction.objects.filter(message__thread=thread, user=request.user)
+        .values("message_id", "emoji")
+    )
+    reaction_map = {}
+    for item in reactions:
+        reaction_map.setdefault(item["message_id"], []).append(item)
+    user_reaction_map = {}
+    for item in user_reactions:
+        user_reaction_map.setdefault(item["message_id"], set()).add(item["emoji"])
+
+    for message in chat_messages:
+        message.reaction_summary = reaction_map.get(message.id, [])
+        message.user_reactions = user_reaction_map.get(message.id, set())
 
     threads = (
         ChatThread.objects.filter(participants=request.user)
@@ -164,3 +187,124 @@ def send_message(request, thread_id):
     )
 
     return JsonResponse({"status": "ok", "message_id": message.id})
+
+
+@login_required
+def edit_message(request, thread_id, message_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "Метод не підтримується."}, status=405)
+
+    thread = get_object_or_404(ChatThread, id=thread_id, participants=request.user)
+    message = get_object_or_404(ChatMessage, id=message_id, thread=thread)
+    if message.sender_id != request.user.id:
+        return JsonResponse({"error": "Недостатньо прав."}, status=403)
+    if message.deleted_at:
+        return JsonResponse({"error": "Повідомлення вже видалено."}, status=400)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+
+    new_text = (payload.get("text") or "").strip()
+    if not new_text and not (message.image or message.file):
+        return JsonResponse({"error": "Повідомлення має містити текст або медіа."}, status=400)
+
+    message.text = new_text
+    message.edited_at = timezone.now()
+    message.save(update_fields=["text", "edited_at"])
+
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"chat_{thread.id}",
+        {
+            "type": "message_edit",
+            "message_id": message.id,
+            "text": message.text,
+            "edited_at": message.edited_at.isoformat(),
+        },
+    )
+
+    return JsonResponse({"status": "ok", "text": message.text})
+
+
+@login_required
+def delete_message(request, thread_id, message_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "Метод не підтримується."}, status=405)
+
+    thread = get_object_or_404(ChatThread, id=thread_id, participants=request.user)
+    message = get_object_or_404(ChatMessage, id=message_id, thread=thread)
+    if message.sender_id != request.user.id:
+        return JsonResponse({"error": "Недостатньо прав."}, status=403)
+    if message.deleted_at:
+        return JsonResponse({"error": "Повідомлення вже видалено."}, status=400)
+
+    if message.image:
+        message.image.delete(save=False)
+        message.image = None
+    if message.file:
+        message.file.delete(save=False)
+        message.file = None
+
+    message.text = ""
+    message.deleted_at = timezone.now()
+    message.save(update_fields=["text", "deleted_at", "image", "file"])
+
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"chat_{thread.id}",
+        {
+            "type": "message_delete",
+            "message_id": message.id,
+            "deleted_at": message.deleted_at.isoformat(),
+        },
+    )
+
+    return JsonResponse({"status": "ok"})
+
+
+@login_required
+def react_message(request, thread_id, message_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "Метод не підтримується."}, status=405)
+
+    thread = get_object_or_404(ChatThread, id=thread_id, participants=request.user)
+    message = get_object_or_404(ChatMessage, id=message_id, thread=thread)
+    if message.deleted_at:
+        return JsonResponse({"error": "Повідомлення видалено."}, status=400)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+
+    emoji = (payload.get("emoji") or "").strip()
+    if not emoji:
+        return JsonResponse({"error": "Не вказано реакцію."}, status=400)
+
+    reaction = ChatReaction.objects.filter(
+        message=message,
+        user=request.user,
+        emoji=emoji,
+    ).first()
+    if reaction:
+        reaction.delete()
+        action = "removed"
+    else:
+        ChatReaction.objects.create(message=message, user=request.user, emoji=emoji)
+        action = "added"
+
+    channel_layer = get_channel_layer()
+    async_to_sync(channel_layer.group_send)(
+        f"chat_{thread.id}",
+        {
+            "type": "reaction_update",
+            "message_id": message.id,
+            "emoji": emoji,
+            "action": action,
+            "reactor_id": request.user.id,
+        },
+    )
+
+    return JsonResponse({"status": "ok", "action": action})
