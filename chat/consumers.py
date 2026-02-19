@@ -211,3 +211,39 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 }
             )
         )
+
+    async def message_edit(self, event):
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "message_edit",
+                    "message_id": event["message_id"],
+                    "text": event["text"],
+                    "edited_at": event["edited_at"],
+                }
+            )
+        )
+
+    async def message_delete(self, event):
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "message_delete",
+                    "message_id": event["message_id"],
+                    "deleted_at": event["deleted_at"],
+                }
+            )
+        )
+
+    async def reaction_update(self, event):
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "reaction_update",
+                    "message_id": event["message_id"],
+                    "emoji": event["emoji"],
+                    "action": event["action"],
+                    "reactor_id": event["reactor_id"],
+                }
+            )
+        )

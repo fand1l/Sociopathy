@@ -58,29 +58,46 @@
 
         <ul id="chatMessages" class="chat-messages" aria-live="polite" data-current-user-id="{{ request.user.id }}">
             {% for message in chat_messages %}
-                <li class="chat-message {% if message.sender_id == request.user.id %}chat-message--own{% endif %}" data-message-id="{{ message.id }}" data-sender-id="{{ message.sender_id }}">
+                <li class="chat-message {% if message.sender_id == request.user.id %}chat-message--own{% endif %}{% if message.deleted_at %} chat-message--deleted{% endif %}" data-message-id="{{ message.id }}" data-sender-id="{{ message.sender_id }}">
                     <div class="chat-message__meta">
                         <span>{{ message.sender.username }}</span>
                         <time datetime="{{ message.created_at|date:"c" }}">{{ message.created_at|date:"H:i" }}</time>
+                        {% if message.edited_at and not message.deleted_at %}
+                            <span class="chat-message__edited">Ред.</span>
+                        {% endif %}
                         {% if message.sender_id == request.user.id %}
                             <span class="chat-message__status">{% if message.read_at %}Прочитано{% endif %}</span>
                         {% endif %}
                     </div>
                     <div class="chat-message__bubble">
-                        {% if message.text %}
-                            <p class="chat-message__text">{{ message.text }}</p>
+                        {% if message.deleted_at %}
+                            <p class="chat-message__deleted">Повідомлення видалено</p>
+                        {% else %}
+                            {% if message.text %}
+                                <p class="chat-message__text">{{ message.text }}</p>
+                            {% endif %}
+                            {% if message.image %}
+                                <a class="chat-message__image-link" href="{{ message.image.url }}" target="_blank" rel="noopener" aria-label="Відкрити зображення">
+                                    <img class="chat-message__image" src="{{ message.image.url }}" alt="Зображення" loading="lazy" />
+                                </a>
+                            {% endif %}
+                            {% if message.file %}
+                                <a class="chat-message__file" href="{{ message.file.url }}" target="_blank" rel="noopener" aria-label="Відкрити файл">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                        <path d="M7 3h7l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm6 1.5V9h4.5L13 4.5z" />
+                                    </svg>
+                                </a>
+                            {% endif %}
                         {% endif %}
-                        {% if message.image %}
-                            <a class="chat-message__image-link" href="{{ message.image.url }}" target="_blank" rel="noopener" aria-label="Відкрити зображення">
-                                <img class="chat-message__image" src="{{ message.image.url }}" alt="Зображення" loading="lazy" />
-                            </a>
-                        {% endif %}
-                        {% if message.file %}
-                            <a class="chat-message__file" href="{{ message.file.url }}" target="_blank" rel="noopener" aria-label="Відкрити файл">
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M7 3h7l5 5v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2zm6 1.5V9h4.5L13 4.5z" />
-                                </svg>
-                            </a>
+                    </div>
+                    <div class="chat-reactions" data-message-id="{{ message.id }}">
+                        {% if not message.deleted_at %}
+                            {% for reaction in message.reaction_summary %}
+                                <button class="chat-reaction{% if reaction.emoji in message.user_reactions %} chat-reaction--active{% endif %}" type="button" data-emoji="{{ reaction.emoji }}" data-count="{{ reaction.count }}">
+                                    <span class="chat-reaction__emoji">{{ reaction.emoji }}</span>
+                                    <span class="chat-reaction__count">{{ reaction.count }}</span>
+                                </button>
+                            {% endfor %}
                         {% endif %}
                     </div>
                 </li>
@@ -107,6 +124,11 @@
             <button type="submit">Надіслати</button>
         </form>
         <div id="chatAttachmentPreview" class="chat-attachments-preview" aria-live="polite"></div>
+        <div id="chatContextMenu" class="chat-context-menu" hidden>
+            <button type="button" class="chat-context-menu__action" data-action="edit">Редагувати</button>
+            <button type="button" class="chat-context-menu__action" data-action="delete">Видалити</button>
+            <div class="chat-context-menu__reactions" data-role="reactions"></div>
+        </div>
     </section>
     {% endif %}
 </div>
@@ -122,10 +144,16 @@
         const fileInput = document.getElementById('chatFile');
         const previewEl = document.getElementById('chatAttachmentPreview');
         const panelEl = document.querySelector('.chat-panel');
+        const contextMenuEl = document.getElementById('chatContextMenu');
         if (!messagesEl || !formEl || !inputEl || !panelEl) return;
 
         const threadId = "{{ thread.id }}";
         const currentUserId = Number(messagesEl.dataset.currentUserId);
+        const csrfToken = formEl.querySelector('[name="csrfmiddlewaretoken"]')?.value || '';
+        const reactions = ['👍', '❤️', '😂', '😮', '😢', '😡'];
+        let editingMessageId = null;
+        let editingHasMedia = false;
+        let contextMessageEl = null;
         const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
         const socket = new WebSocket(`${scheme}://${window.location.host}/ws/chat/${threadId}/`);
 
@@ -143,6 +171,85 @@
 
         const scrollToBottom = () => {
             messagesEl.scrollTop = messagesEl.scrollHeight;
+        };
+
+        const getMessageEl = (messageId) =>
+            messagesEl.querySelector(`[data-message-id="${messageId}"]`);
+
+        const ensureReactionsContainer = (messageEl) => {
+            let reactionsEl = messageEl.querySelector('.chat-reactions');
+            if (!reactionsEl) {
+                reactionsEl = document.createElement('div');
+                reactionsEl.className = 'chat-reactions';
+                reactionsEl.dataset.messageId = messageEl.dataset.messageId;
+                messageEl.appendChild(reactionsEl);
+            }
+            return reactionsEl;
+        };
+
+        const setEditedIndicator = (messageEl, isEdited) => {
+            const metaEl = messageEl.querySelector('.chat-message__meta');
+            if (!metaEl) return;
+            let editedEl = metaEl.querySelector('.chat-message__edited');
+            if (isEdited && !editedEl) {
+                editedEl = document.createElement('span');
+                editedEl.className = 'chat-message__edited';
+                editedEl.textContent = 'Ред.';
+                metaEl.insertBefore(editedEl, metaEl.querySelector('.chat-message__status'));
+            }
+        };
+
+        const updateMessageText = (messageEl, text) => {
+            const bubbleEl = messageEl.querySelector('.chat-message__bubble');
+            if (!bubbleEl) return;
+            let textEl = bubbleEl.querySelector('.chat-message__text');
+            if (text) {
+                if (!textEl) {
+                    textEl = document.createElement('p');
+                    textEl.className = 'chat-message__text';
+                    bubbleEl.prepend(textEl);
+                }
+                textEl.textContent = text;
+            } else if (textEl) {
+                textEl.remove();
+            }
+        };
+
+        const setMessageDeleted = (messageEl) => {
+            messageEl.classList.add('chat-message--deleted');
+            const editedEl = messageEl.querySelector('.chat-message__edited');
+            if (editedEl) editedEl.remove();
+            const bubbleEl = messageEl.querySelector('.chat-message__bubble');
+            if (!bubbleEl) return;
+            bubbleEl.innerHTML = '';
+            const deletedEl = document.createElement('p');
+            deletedEl.className = 'chat-message__deleted';
+            deletedEl.textContent = 'Повідомлення видалено';
+            bubbleEl.appendChild(deletedEl);
+            const reactionsEl = messageEl.querySelector('.chat-reactions');
+            if (reactionsEl) reactionsEl.innerHTML = '';
+        };
+
+        const updateReactionButton = (reactionsEl, emoji, count, isActive) => {
+            let button = reactionsEl.querySelector(`[data-emoji="${emoji}"]`);
+            if (count <= 0) {
+                if (button) button.remove();
+                return;
+            }
+            if (!button) {
+                button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'chat-reaction';
+                button.dataset.emoji = emoji;
+                button.innerHTML = `
+                    <span class="chat-reaction__emoji">${emoji}</span>
+                    <span class="chat-reaction__count"></span>
+                `;
+                reactionsEl.appendChild(button);
+            }
+            button.dataset.count = String(count);
+            button.querySelector('.chat-reaction__count').textContent = String(count);
+            button.classList.toggle('chat-reaction--active', isActive);
         };
 
         const buildBubble = (payload) => {
@@ -206,6 +313,10 @@
                 </div>
             `;
             item.appendChild(buildBubble(payload));
+            const reactionsEl = document.createElement('div');
+            reactionsEl.className = 'chat-reactions';
+            reactionsEl.dataset.messageId = payload.message_id;
+            item.appendChild(reactionsEl);
             messagesEl.appendChild(item);
             scrollToBottom();
             maybeSendReadReceipt();
@@ -252,15 +363,167 @@
                     const statusEl = messageEl.querySelector('.chat-message__status');
                     if (statusEl) statusEl.textContent = 'Прочитано';
                 });
+                return;
+            }
+            if (data.type === 'message_edit') {
+                const messageEl = getMessageEl(data.message_id);
+                if (!messageEl || messageEl.classList.contains('chat-message--deleted')) return;
+                updateMessageText(messageEl, data.text || '');
+                setEditedIndicator(messageEl, true);
+                return;
+            }
+            if (data.type === 'message_delete') {
+                const messageEl = getMessageEl(data.message_id);
+                if (!messageEl) return;
+                setMessageDeleted(messageEl);
+                return;
+            }
+            if (data.type === 'reaction_update') {
+                const messageEl = getMessageEl(data.message_id);
+                if (!messageEl || messageEl.classList.contains('chat-message--deleted')) return;
+                const reactionsEl = ensureReactionsContainer(messageEl);
+                const currentButton = reactionsEl.querySelector(`[data-emoji="${data.emoji}"]`);
+                const currentCount = currentButton ? Number(currentButton.dataset.count || 0) : 0;
+                const nextCount = data.action === 'added' ? currentCount + 1 : currentCount - 1;
+                const isActive = data.reactor_id === currentUserId ? data.action === 'added' : currentButton?.classList.contains('chat-reaction--active');
+                updateReactionButton(reactionsEl, data.emoji, nextCount, Boolean(isActive));
             }
         };
+
+        const submitButton = formEl.querySelector('button[type="submit"]');
+
+        const closeContextMenu = () => {
+            if (!contextMenuEl) return;
+            contextMenuEl.hidden = true;
+            contextMessageEl = null;
+        };
+
+        const openContextMenu = (messageEl, x, y) => {
+            if (!contextMenuEl) return;
+            contextMessageEl = messageEl;
+            contextMenuEl.hidden = false;
+            const menuRect = contextMenuEl.getBoundingClientRect();
+            const maxX = window.innerWidth - menuRect.width - 8;
+            const maxY = window.innerHeight - menuRect.height - 8;
+            contextMenuEl.style.left = `${Math.min(x, Math.max(8, maxX))}px`;
+            contextMenuEl.style.top = `${Math.min(y, Math.max(8, maxY))}px`;
+            const isOwn = Number(messageEl.dataset.senderId) === currentUserId;
+            const isDeleted = messageEl.classList.contains('chat-message--deleted');
+            contextMenuEl.querySelector('[data-action="edit"]').hidden = !isOwn || isDeleted;
+            contextMenuEl.querySelector('[data-action="delete"]').hidden = !isOwn || isDeleted;
+
+            const reactionsWrap = contextMenuEl.querySelector('[data-role="reactions"]');
+            reactionsWrap.innerHTML = '';
+            reactions.forEach((emoji) => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'chat-context-menu__reaction';
+                button.dataset.emoji = emoji;
+                button.textContent = emoji;
+                reactionsWrap.appendChild(button);
+            });
+        };
+
+        const postJson = (url, payload) =>
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken,
+                },
+                body: JSON.stringify(payload),
+                credentials: 'same-origin',
+            });
+
+        const startEditing = (messageEl) => {
+            const textEl = messageEl.querySelector('.chat-message__text');
+            const currentText = textEl ? textEl.textContent : '';
+            editingMessageId = Number(messageEl.dataset.messageId);
+            editingHasMedia = Boolean(messageEl.querySelector('.chat-message__image, .chat-message__file'));
+            inputEl.value = currentText;
+            inputEl.focus();
+            if (imageInput) imageInput.value = '';
+            if (fileInput) fileInput.value = '';
+            if (previewEl) previewEl.innerHTML = '';
+            if (submitButton) submitButton.textContent = 'Зберегти';
+        };
+
+        const clearEditing = () => {
+            editingMessageId = null;
+            editingHasMedia = false;
+            if (submitButton) submitButton.textContent = 'Надіслати';
+        };
+
+        messagesEl.addEventListener('contextmenu', (event) => {
+            const target = event.target instanceof HTMLElement ? event.target : null;
+            if (!target) return;
+            const messageEl = target.closest('.chat-message');
+            if (!messageEl) return;
+            event.preventDefault();
+            openContextMenu(messageEl, event.clientX, event.clientY);
+        });
+
+        document.addEventListener('click', (event) => {
+            if (!contextMenuEl || contextMenuEl.hidden) return;
+            const target = event.target instanceof HTMLElement ? event.target : null;
+            if (target && contextMenuEl.contains(target)) return;
+            closeContextMenu();
+        });
+
+        if (contextMenuEl) {
+            contextMenuEl.addEventListener('click', async (event) => {
+                const target = event.target instanceof HTMLElement ? event.target : null;
+                if (!target || !contextMessageEl) return;
+                const action = target.dataset.action;
+                if (action === 'edit') {
+                    startEditing(contextMessageEl);
+                    closeContextMenu();
+                    return;
+                }
+                if (action === 'delete') {
+                    const messageId = Number(contextMessageEl.dataset.messageId);
+                    await postJson(`/chat/${threadId}/message/${messageId}/delete/`, {});
+                    closeContextMenu();
+                    return;
+                }
+                if (target.dataset.emoji) {
+                    const messageId = Number(contextMessageEl.dataset.messageId);
+                    await postJson(`/chat/${threadId}/message/${messageId}/react/`, { emoji: target.dataset.emoji });
+                    closeContextMenu();
+                }
+            });
+        }
+
+        messagesEl.addEventListener('click', async (event) => {
+            const target = event.target instanceof HTMLElement ? event.target : null;
+            if (!target) return;
+            const reactionButton = target.closest('.chat-reaction');
+            if (!reactionButton) return;
+            const messageEl = reactionButton.closest('.chat-message');
+            if (!messageEl || messageEl.classList.contains('chat-message--deleted')) return;
+            const messageId = Number(messageEl.dataset.messageId);
+            await postJson(`/chat/${threadId}/message/${messageId}/react/`, { emoji: reactionButton.dataset.emoji });
+        });
 
         formEl.addEventListener('submit', async (event) => {
             event.preventDefault();
             const hasText = inputEl.value.trim();
             const hasImage = imageInput && imageInput.files && imageInput.files.length > 0;
             const hasFile = fileInput && fileInput.files && fileInput.files.length > 0;
-            if (!hasText && !hasImage && !hasFile) return;
+            if (!editingMessageId && !hasText && !hasImage && !hasFile) return;
+
+            if (editingMessageId) {
+                if (!hasText && !editingHasMedia) return;
+                const response = await postJson(`/chat/${threadId}/message/${editingMessageId}/edit/`, { text: inputEl.value });
+                if (!response.ok) {
+                    const errorPayload = await response.json().catch(() => null);
+                    console.error('Chat edit failed', errorPayload);
+                    return;
+                }
+                inputEl.value = '';
+                clearEditing();
+                return;
+            }
 
             const formData = new FormData(formEl);
             const response = await fetch(formEl.action, {
@@ -348,6 +611,12 @@
             if (typingTimeout) clearTimeout(typingTimeout);
             sendTyping(true);
             typingTimeout = setTimeout(() => sendTyping(false), 1200);
+        });
+
+        inputEl.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape' || !editingMessageId) return;
+            inputEl.value = '';
+            clearEditing();
         });
 
         if (imageInput) imageInput.addEventListener('change', renderAttachmentPreview);
