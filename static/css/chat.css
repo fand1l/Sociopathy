@@ -317,6 +317,10 @@
     min-width: 160px;
 }
 
+.chat-context-menu[hidden] {
+    display: none;
+}
+
 .chat-context-menu__action {
     border: none;
     background: var(--color-surface-3);

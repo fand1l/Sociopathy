@@ -34,8 +34,12 @@
                         </a>
                     </li>
                     <li class="menu__item">
-                        <a href="#" class="menu__link">
-                            <i class="bx bx-compass"></i>
+                        <a href="{% url 'posts:search' %}" class="menu__link {% if request.resolver_match.view_name == 'posts:search' %}menu__link--active{% endif %}">
+                            {% if request.resolver_match.view_name == 'posts:search' %}
+                                <i class="bxf bx-search"></i>
+                            {% else %}
+                                <i class="bx bx-search"></i>
+                            {% endif %}
                         </a>
                     </li>
                     <li class="menu__item new_post">

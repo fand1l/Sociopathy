@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Пошук{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="{% static 'css/feed.css' %}">
+<link rel="stylesheet" href="{% static 'css/search.css' %}">
+{% endblock %}
+
+{% block header_title %}Пошук{% endblock %}
+
+{% block content %}
+<div class="search-page">
+    <section class="search-hero">
+        <div class="search-hero__content">
+            <h2>Шукай людей і пости</h2>
+            <p>Введіть нікнейм, ключові слова або тему поста.</p>
+            <form method="GET" action="{% url 'posts:search' %}" class="search-form">
+                <input
+                    type="text"
+                    name="q"
+                    placeholder="Наприклад: кіберпанк, @alex, дизайн"
+                    value="{{ display_query|default_if_none:'' }}"
+                    aria-label="Пошук"
+                >
+                <button type="submit" class="search-form__button">
+                    <i class="bx bx-search"></i>
+                    <span>Шукати</span>
+                </button>
+            </form>
+            <div class="search-hero__meta">
+                {% if display_query %}
+                    <span>Запит: "{{ display_query }}"</span>
+                    <span>{{ user_count }} користувачів · {{ post_count }} публікацій</span>
+                {% else %}
+                    <span>Швидкий пошук по нікнеймах і текстах</span>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    <section class="search-section" style="animation-delay: 0.05s;">
+        <div class="search-section__header">
+            <h3>Користувачі</h3>
+            {% if display_query %}<span class="search-section__count">{{ user_count }}</span>{% endif %}
+        </div>
+        <div class="search-grid">
+            {% for person in user_results %}
+                <article class="search-card">
+                    <div class="search-card__avatar">
+                        <a href="{{ person.profile.get_absolute_url }}">
+                            <img src="{{ person.profile.avatar_url }}" alt="{{ person.username }}">
+                        </a>
+                    </div>
+                    <div class="search-card__body">
+                        <a href="{{ person.profile.get_absolute_url }}" class="search-card__title">{{ person.username }}</a>
+                        <p class="search-card__subtitle">@{{ person.username }}</p>
+                        <p class="search-card__text">
+                            {% if person.profile.bio %}
+                                {{ person.profile.bio|truncatechars:120 }}
+                            {% else %}
+                                Короткий опис поки що відсутній.
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="search-card__actions">
+                        <a href="{{ person.profile.get_absolute_url }}" class="search-card__button">Переглянути</a>
+                    </div>
+                </article>
+            {% empty %}
+                <div class="search-empty">
+                    {% if display_query %}
+                        <i class="bx bx-user-x"></i>
+                        <p>Нікого не знайдено. Спробуйте інший запит.</p>
+                    {% else %}
+                        <i class="bx bx-user"></i>
+                        <p>Почніть вводити, щоб знайти користувачів.</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="search-section" style="animation-delay: 0.15s;">
+        <div class="search-section__header">
+            <h3>Публікації</h3>
+            {% if display_query %}<span class="search-section__count">{{ post_count }}</span>{% endif %}
+        </div>
+        <div class="search-posts">
+            {% for post in post_results %}
+                <article class="post-card post-card--search">
+                    <div class="post-card__header">
+                        <div class="post-card__user">
+                            <div class="avatar-wrapper">
+                                <a href="{% url 'accounts:profile_detail' post.author.username %}">
+                                    <img src="{{ post.author.profile.avatar_url }}" alt="{{ post.author.username }}" class="user-avatar user-avatar--small">
+                                </a>
+                            </div>
+                            <div class="user-info">
+                                <a href="{% url 'accounts:profile_detail' post.author.username %}" class="user-info__name">
+                                    {{ post.author.username }}
+                                </a>
+                                <span class="user-info__date">{{ post.created_at|date:"d M H:i" }}</span>
+                            </div>
+                        </div>
+                        <a href="{% url 'posts:post_detail' post.pk %}" class="search-post__link" aria-label="Відкрити пост">
+                            <i class="bx bx-link-external"></i>
+                        </a>
+                    </div>
+                    <div class="post-card__content">
+                        {% if post.reposted_post %}
+                            <div class="post-card__repost">
+                                Репост від
+                                <a href="{% url 'accounts:profile_detail' post.reposted_post.author.username %}">
+                                    {{ post.reposted_post.author.username }}
+                                </a>
+                            </div>
+                        {% endif %}
+                        <p>
+                            {% if post.reposted_post %}
+                                {{ post.reposted_post.content|truncatechars:260 }}
+                            {% else %}
+                                {{ post.content|truncatechars:260 }}
+                            {% endif %}
+                        </p>
+                        {% if post.reposted_post and post.reposted_post.image %}
+                            <div class="post-card__image">
+                                <img src="{{ post.reposted_post.image.url }}" alt="Post image">
+                            </div>
+                        {% elif post.image %}
+                            <div class="post-card__image">
+                                <img src="{{ post.image.url }}" alt="Post image">
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="post-card__footer post-card__footer--search">
+                        <span><i class="bx bx-heart"></i> {{ post.likes.count }}</span>
+                        <span><i class="bx bx-message-circle"></i> {{ post.replies.count }}</span>
+                        <a href="{% url 'posts:post_detail' post.pk %}" class="search-post__cta">Переглянути</a>
+                    </div>
+                </article>
+            {% empty %}
+                <div class="search-empty search-empty--posts">
+                    {% if display_query %}
+                        <i class="bx bx-message-square-x"></i>
+                        <p>Публікацій за запитом не знайдено.</p>
+                    {% else %}
+                        <i class="bx bx-message-square-detail"></i>
+                        <p>Введіть ключові слова, щоб знайти публікації.</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+{% endblock %}

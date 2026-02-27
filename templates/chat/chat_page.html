@@ -463,12 +463,13 @@
             openContextMenu(messageEl, event.clientX, event.clientY);
         });
 
-        document.addEventListener('click', (event) => {
+        document.addEventListener('pointerdown', (event) => {
             if (!contextMenuEl || contextMenuEl.hidden) return;
             const target = event.target instanceof HTMLElement ? event.target : null;
             if (target && contextMenuEl.contains(target)) return;
             closeContextMenu();
         });
+
 
         if (contextMenuEl) {
             contextMenuEl.addEventListener('click', async (event) => {
