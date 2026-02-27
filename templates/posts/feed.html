@@ -71,9 +71,13 @@
                 <div class="post-card__content">
                     {% if post.reposted_post %}
                         <div class="post-card__repost">
-                            Репост від
+                            <span>Репост від</span>
                             <a href="{% url 'accounts:profile_detail' post.reposted_post.author.username %}">
-                                {{ post.reposted_post.author.username }}
+                                {% if post.reposted_post.author.avatar %}
+                                    <img src="{{ post.reposted_post.author.avatar.url }}" style="width: 30px; height: 30px; border-radius: 50%;">
+                                {% else %}
+                                    {{ post.reposted_post.author.username }}
+                                {% endif %}
                             </a>
                         </div>
                     {% endif %}
