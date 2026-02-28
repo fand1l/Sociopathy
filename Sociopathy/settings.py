@@ -28,9 +28,13 @@ DEBUG = True
 
 ALLOWED_HOSTS = [
     'sociopathy-ere4eje5gaczeeat.norwayeast-01.azurewebsites.net',
+    '127.0.0.1',
     'localhost',
-    '127.0.0.1'
+    '.azurewebsites.net',
 ]
+
+if 'WEBSITE_HOSTNAME' in os.environ:
+    ALLOWED_HOSTS.append(os.environ.get('WEBSITE_HOSTNAME'))
 
 LOGIN_URL = "/login/"
 AUTH_USER_MODEL = 'accounts.CustomUser'
