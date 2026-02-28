@@ -26,7 +26,11 @@ SECRET_KEY = 'django-insecure-l$#cswha7*mzohj0vuo^2bmt+0bccch$0grue7_5wt+c*pk@71
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["https://sociopathy-ere4eje5gaczeeat.norwayeast-01.azurewebsites.net/"]
+ALLOWED_HOSTS = [
+    'sociopathy-ere4eje5gaczeeat.norwayeast-01.azurewebsites.net',
+    'localhost',
+    '127.0.0.1'
+]
 
 LOGIN_URL = "/login/"
 AUTH_USER_MODEL = 'accounts.CustomUser'
