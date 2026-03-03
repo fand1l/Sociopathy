@@ -1,20 +1,37 @@
 import json
 
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.db.models import Count, Max
-from django.http import JsonResponse
+from django.http import HttpResponseForbidden, JsonResponse
 from django.utils import timezone
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.views import View
+from django.views.generic import CreateView, DetailView, ListView
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 from relationships.models import Follow
-from .forms import ChatMessageForm
-from .models import ChatMessage, ChatReaction, ChatThread
+from .forms import (
+    ChatGroupForm,
+    ChatGroupMemberAddForm,
+    ChatGroupMessageForm,
+    ChatGroupRoleForm,
+    ChatMessageForm,
+)
+from .models import (
+    ChatGroup,
+    ChatGroupMembership,
+    ChatGroupMessage,
+    ChatMessage,
+    ChatReaction,
+    ChatThread,
+)
 
 User = get_user_model()
 
@@ -308,3 +325,247 @@ def react_message(request, thread_id, message_id):
     )
 
     return JsonResponse({"status": "ok", "action": action})
+
+
+class GroupListView(LoginRequiredMixin, ListView):
+    model = ChatGroup
+    template_name = "chat/group_list.html"
+    context_object_name = "groups"
+
+    def get_queryset(self):
+        return (
+            ChatGroup.objects.filter(
+                memberships__user=self.request.user,
+                memberships__is_banned=False,
+            )
+            .select_related("owner")
+            .order_by("-updated_at")
+        )
+
+
+class GroupCreateView(LoginRequiredMixin, CreateView):
+    model = ChatGroup
+    form_class = ChatGroupForm
+    template_name = "chat/group_create.html"
+
+    def form_valid(self, form):
+        group = form.save(commit=False)
+        group.owner = self.request.user
+        group.save()
+        ChatGroupMembership.objects.create(
+            group=group,
+            user=self.request.user,
+            role=ChatGroupMembership.Role.OWNER,
+        )
+        return redirect("chat:group_detail", group_id=group.id)
+
+
+class GroupAccessMixin(LoginRequiredMixin):
+    def get_group(self):
+        if not hasattr(self, "group"):
+            self.group = get_object_or_404(ChatGroup, id=self.kwargs["group_id"])
+        return self.group
+
+    def dispatch(self, request, *args, **kwargs):
+        group = self.get_group()
+        membership = group.get_membership(request.user)
+        if not membership and group.is_owner(request.user):
+            membership = ChatGroupMembership.objects.create(
+                group=group,
+                user=request.user,
+                role=ChatGroupMembership.Role.OWNER,
+            )
+        if not membership or membership.is_banned:
+            return HttpResponseForbidden("Недостатньо прав.")
+        self.membership = membership
+        return super().dispatch(request, *args, **kwargs)
+
+
+class GroupDetailView(GroupAccessMixin, DetailView):
+    model = ChatGroup
+    pk_url_kwarg = "group_id"
+    template_name = "chat/group_detail.html"
+    context_object_name = "group"
+
+    def get_queryset(self):
+        return ChatGroup.objects.select_related("owner")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        group = self.get_object()
+        context["messages"] = group.messages.select_related("sender")
+        context["message_form"] = ChatGroupMessageForm()
+        context["member_add_form"] = ChatGroupMemberAddForm()
+        context["role_form"] = ChatGroupRoleForm()
+        context["membership"] = self.membership
+        context["is_owner"] = group.is_owner(self.request.user)
+        context["is_admin"] = group.is_admin(self.request.user)
+        context["memberships"] = group.memberships.select_related("user").order_by(
+            "-role", "user__username"
+        )
+        return context
+
+
+class GroupMessageCreateView(GroupAccessMixin, View):
+    def post(self, request, group_id):
+        form = ChatGroupMessageForm(request.POST)
+        if not form.is_valid():
+            messages.error(request, "Повідомлення має містити текст.")
+            return redirect("chat:group_detail", group_id=group_id)
+
+        message = form.save(commit=False)
+        message.group = self.get_group()
+        message.sender = request.user
+        message.save()
+        self.group.save(update_fields=["updated_at"])
+        if request.headers.get("x-requested-with") == "XMLHttpRequest":
+            return JsonResponse({"status": "ok", "message_id": message.id})
+        return redirect("chat:group_detail", group_id=group_id)
+
+
+class GroupMessageEditView(GroupAccessMixin, View):
+    def post(self, request, group_id, message_id):
+        group = self.get_group()
+        message = get_object_or_404(ChatGroupMessage, id=message_id, group=group)
+        if message.sender_id != request.user.id:
+            return HttpResponseForbidden("Недостатньо прав.")
+        if message.deleted_at:
+            return JsonResponse({"error": "Повідомлення вже видалено."}, status=400)
+
+        try:
+            payload = json.loads(request.body or "{}")
+        except json.JSONDecodeError:
+            payload = {}
+
+        new_text = (payload.get("text") or "").strip()
+        if not new_text:
+            return JsonResponse({"error": "Повідомлення має містити текст."}, status=400)
+
+        message.text = new_text
+        message.edited_at = timezone.now()
+        message.save(update_fields=["text", "edited_at"])
+
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"group_{group.id}",
+            {
+                "type": "group_message_edit",
+                "message_id": message.id,
+                "text": message.text,
+                "edited_at": message.edited_at.isoformat(),
+            },
+        )
+
+        return JsonResponse({"status": "ok", "text": message.text})
+
+
+class GroupMessageDeleteView(GroupAccessMixin, View):
+    def post(self, request, group_id, message_id):
+        group = self.get_group()
+        message = get_object_or_404(ChatGroupMessage, id=message_id, group=group)
+        if not group.is_admin(request.user) and message.sender_id != request.user.id:
+            return HttpResponseForbidden("Недостатньо прав.")
+        if message.deleted_at:
+            return JsonResponse({"error": "Повідомлення вже видалено."}, status=400)
+        message.text = ""
+        message.deleted_at = timezone.now()
+        message.save(update_fields=["text", "deleted_at"])
+
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"group_{group.id}",
+            {
+                "type": "group_message_delete",
+                "message_id": message.id,
+                "deleted_at": message.deleted_at.isoformat(),
+            },
+        )
+
+        return JsonResponse({"status": "ok"})
+
+
+class GroupMemberAddView(GroupAccessMixin, View):
+    def post(self, request, group_id):
+        group = self.get_group()
+        if not group.is_admin(request.user):
+            return HttpResponseForbidden("Недостатньо прав.")
+        form = ChatGroupMemberAddForm(request.POST)
+        if not form.is_valid():
+            return redirect("chat:group_detail", group_id=group.id)
+
+        username = form.cleaned_data["username"].strip()
+        if not username:
+            messages.error(request, "Вкажіть нікнейм користувача.")
+            return redirect("chat:group_detail", group_id=group.id)
+
+        user = User.objects.filter(username=username).first()
+        if not user:
+            messages.error(request, "Користувача з таким нікнеймом не знайдено.")
+            return redirect("chat:group_detail", group_id=group.id)
+        membership, created = ChatGroupMembership.objects.get_or_create(
+            group=group,
+            user=user,
+            defaults={"role": ChatGroupMembership.Role.MEMBER},
+        )
+        if not created:
+            membership.role = ChatGroupMembership.Role.MEMBER
+            membership.is_banned = False
+            membership.banned_at = None
+            membership.save(update_fields=["role", "is_banned", "banned_at"])
+
+        return redirect("chat:group_detail", group_id=group.id)
+
+
+class GroupMemberKickView(GroupAccessMixin, View):
+    def post(self, request, group_id, user_id):
+        group = self.get_group()
+        if not group.is_admin(request.user):
+            return HttpResponseForbidden("Недостатньо прав.")
+        target = get_object_or_404(User, id=user_id)
+        membership = get_object_or_404(ChatGroupMembership, group=group, user=target)
+        if membership.role == ChatGroupMembership.Role.OWNER:
+            return HttpResponseForbidden("Недостатньо прав.")
+        if (
+            membership.role == ChatGroupMembership.Role.ADMIN
+            and not group.is_owner(request.user)
+        ):
+            return HttpResponseForbidden("Недостатньо прав.")
+        membership.delete()
+        return redirect("chat:group_detail", group_id=group.id)
+
+
+class GroupMemberBanView(GroupAccessMixin, View):
+    def post(self, request, group_id, user_id):
+        group = self.get_group()
+        if not group.is_admin(request.user):
+            return HttpResponseForbidden("Недостатньо прав.")
+        target = get_object_or_404(User, id=user_id)
+        membership = get_object_or_404(ChatGroupMembership, group=group, user=target)
+        if membership.role == ChatGroupMembership.Role.OWNER:
+            return HttpResponseForbidden("Недостатньо прав.")
+        if (
+            membership.role == ChatGroupMembership.Role.ADMIN
+            and not group.is_owner(request.user)
+        ):
+            return HttpResponseForbidden("Недостатньо прав.")
+        membership.is_banned = True
+        membership.banned_at = timezone.now()
+        membership.save(update_fields=["is_banned", "banned_at"])
+        return redirect("chat:group_detail", group_id=group.id)
+
+
+class GroupMemberRoleUpdateView(GroupAccessMixin, View):
+    def post(self, request, group_id, user_id):
+        group = self.get_group()
+        if not group.is_owner(request.user):
+            return HttpResponseForbidden("Недостатньо прав.")
+        form = ChatGroupRoleForm(request.POST)
+        if not form.is_valid():
+            return redirect("chat:group_detail", group_id=group.id)
+        target = get_object_or_404(User, id=user_id)
+        membership = get_object_or_404(ChatGroupMembership, group=group, user=target)
+        if membership.role == ChatGroupMembership.Role.OWNER:
+            return HttpResponseForbidden("Недостатньо прав.")
+        membership.role = form.cleaned_data["role"]
+        membership.save(update_fields=["role"])
+        return redirect("chat:group_detail", group_id=group.id)

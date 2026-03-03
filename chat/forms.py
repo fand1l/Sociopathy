@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import ChatMessage
+from .models import ChatGroup, ChatGroupMembership, ChatGroupMessage, ChatMessage
 
 
 class ChatMessageForm(forms.ModelForm):
@@ -26,3 +26,49 @@ class ChatMessageForm(forms.ModelForm):
             raise forms.ValidationError("Повідомлення має містити текст або медіа.")
 
         return cleaned_data
+
+
+class ChatGroupForm(forms.ModelForm):
+    class Meta:
+        model = ChatGroup
+        fields = ["name"]
+        widgets = {
+            "name": forms.TextInput(
+                attrs={
+                    "placeholder": "Назва групи",
+                }
+            )
+        }
+
+
+class ChatGroupMessageForm(forms.ModelForm):
+    class Meta:
+        model = ChatGroupMessage
+        fields = ["text"]
+        widgets = {
+            "text": forms.Textarea(
+                attrs={
+                    "rows": 3,
+                    "placeholder": "Напишіть повідомлення...",
+                }
+            )
+        }
+
+    def clean_text(self):
+        text = (self.cleaned_data.get("text") or "").strip()
+        if not text:
+            raise forms.ValidationError("Повідомлення має містити текст.")
+        return text
+
+
+class ChatGroupMemberAddForm(forms.Form):
+    username = forms.CharField(max_length=150)
+
+
+class ChatGroupRoleForm(forms.Form):
+    role = forms.ChoiceField(
+        choices=[
+            (ChatGroupMembership.Role.MEMBER, "Учасник"),
+            (ChatGroupMembership.Role.ADMIN, "Адмін"),
+        ]
+    )

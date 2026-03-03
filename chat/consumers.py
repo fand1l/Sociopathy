@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.utils import timezone
 
-from .models import ChatMessage, ChatThread
+from .models import ChatGroup, ChatGroupMessage, ChatGroupMembership, ChatMessage, ChatThread
 
 User = get_user_model()
 
@@ -244,6 +244,114 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "emoji": event["emoji"],
                     "action": event["action"],
                     "reactor_id": event["reactor_id"],
+                }
+            )
+        )
+
+
+class ChatGroupConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.group_id = self.scope["url_route"]["kwargs"]["group_id"]
+        self.room_group_name = f"group_{self.group_id}"
+
+        user = self.scope.get("user")
+        if not user or not user.is_authenticated:
+            await self.close()
+            return
+
+        self.user = user
+        is_member = await self.is_member(user.id)
+        if not is_member:
+            await self.close()
+            return
+
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+
+    async def receive(self, text_data):
+        data = json.loads(text_data)
+        event_type = data.get("type", "message")
+        if event_type != "message":
+            return
+
+        message_text = (data.get("message") or "").strip()
+        if not message_text:
+            return
+
+        message = await self.save_message(self.user.id, message_text)
+        if not message:
+            return
+
+        await self.channel_layer.group_send(
+            self.room_group_name,
+            {
+                "type": "group_message",
+                "message": message.text,
+                "username": self.user.username,
+                "sender_id": self.user.id,
+                "message_id": message.id,
+                "created_at": message.created_at.isoformat(),
+            },
+        )
+
+    @database_sync_to_async
+    def is_member(self, user_id):
+        return ChatGroupMembership.objects.filter(
+            group_id=self.group_id,
+            user_id=user_id,
+            is_banned=False,
+        ).exists()
+
+    @database_sync_to_async
+    def save_message(self, user_id, message_text):
+        user = User.objects.get(id=user_id)
+        group = ChatGroup.objects.get(id=self.group_id)
+        if not group.memberships.filter(user_id=user_id, is_banned=False).exists():
+            return None
+        message = ChatGroupMessage.objects.create(
+            sender=user,
+            group=group,
+            text=message_text,
+        )
+        group.save(update_fields=["updated_at"])
+        return message
+
+    async def group_message(self, event):
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "message",
+                    "message": event["message"],
+                    "username": event["username"],
+                    "sender_id": event["sender_id"],
+                    "message_id": event["message_id"],
+                    "created_at": event["created_at"],
+                }
+            )
+        )
+
+    async def group_message_edit(self, event):
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "message_edit",
+                    "message_id": event["message_id"],
+                    "text": event["text"],
+                    "edited_at": event["edited_at"],
+                }
+            )
+        )
+
+    async def group_message_delete(self, event):
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "message_delete",
+                    "message_id": event["message_id"],
+                    "deleted_at": event["deleted_at"],
                 }
             )
         )
