@@ -1,0 +1,376 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ group.name }}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chat.css' %}">
+{% endblock %}
+
+{% block content_class %}site__content--chat{% endblock %}
+
+{% block header_title %}{{ group.name }}{% endblock %}
+
+{% block content %}
+<div class="chat-layout">
+    <aside class="chat-threads">
+        <div class="chat-panel__header">
+            <h2>Учасники</h2>
+            <p>Керуйте ролями та доступом до групи.</p>
+            <div class="chat-panel__actions">
+                <a href="{% url 'chat:group_list' %}">До списку груп</a>
+                <a href="{% url 'chat:thread_list' %}">Приватні чати</a>
+            </div>
+        </div>
+        <div class="chat-thread-list">
+            {% for member in memberships %}
+                <div class="chat-thread">
+                    <div class="chat-thread__avatar">{{ member.user.username|slice:":1"|upper }}</div>
+                    <div class="chat-thread__body">
+                        <div class="chat-thread__name">{{ member.user.username }}</div>
+                        <div class="chat-thread__meta">
+                            Роль: {{ member.get_role_display }}
+                            {% if member.is_banned %}(бан){% endif %}
+                        </div>
+                    </div>
+                    {% if member.role != 'owner' and is_owner or is_admin %}
+                        <div class="chat-member-menu" data-member-menu>
+                            <button class="chat-member-menu__toggle" type="button" aria-haspopup="true" aria-expanded="false">
+                                <i class="bx bx-dots-vertical-rounded" aria-hidden="true"></i>
+                            </button>
+                            <div class="chat-member-menu__dropdown" role="menu">
+                                {% if is_owner %}
+                                    <form class="chat-member-menu__form" method="post" action="{% url 'chat:group_member_role' group.id member.user.id %}">
+                                        {% csrf_token %}
+                                        <div class="chat-member-menu__row">
+                                            <i class="bx bx-shield" aria-hidden="true"></i>
+                                            {{ role_form.role }}
+                                            <button type="submit">Змінити</button>
+                                        </div>
+                                    </form>
+                                {% endif %}
+                                {% if is_admin %}
+                                    <form class="chat-member-menu__form" method="post" action="{% url 'chat:group_member_kick' group.id member.user.id %}">
+                                        {% csrf_token %}
+                                        <button class="chat-member-menu__action" type="submit">
+                                            <i class="bx bx-user-x" aria-hidden="true"></i>
+                                            <span>Кік</span>
+                                        </button>
+                                    </form>
+                                    <form class="chat-member-menu__form" method="post" action="{% url 'chat:group_member_ban' group.id member.user.id %}">
+                                        {% csrf_token %}
+                                        <button class="chat-member-menu__action chat-member-menu__action--danger" type="submit">
+                                            <i class="bx bx-block" aria-hidden="true"></i>
+                                            <span>Бан</span>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            {% empty %}
+                <div class="chat-empty">Немає учасників.</div>
+            {% endfor %}
+        </div>
+        {% if is_admin %}
+            <form class="chat-form" method="post" action="{% url 'chat:group_member_add' group.id %}">
+                {% csrf_token %}
+                {{ member_add_form.username }}
+                <button type="submit">Додати</button>
+            </form>
+        {% endif %}
+    </aside>
+
+    <section class="chat-panel">
+        <div class="chat-panel__header">
+            <div class="chat-panel__title">
+                <h2>{{ group.name }}</h2>
+                <p>Власник: {{ group.owner.username }}</p>
+            </div>
+        </div>
+        <ul id="groupMessages" class="chat-messages" data-current-user-id="{{ request.user.id }}" data-is-admin="{{ is_admin|yesno:'true,false' }}">
+            {% for message in messages %}
+                <li class="chat-message {% if message.sender_id == request.user.id %}chat-message--own{% endif %}{% if message.deleted_at %} chat-message--deleted{% endif %}" data-message-id="{{ message.id }}" data-sender-id="{{ message.sender_id }}">
+                    <div class="chat-message__meta">
+                        <span>{{ message.sender.username }}</span>
+                        <time datetime="{{ message.created_at|date:"c" }}">{{ message.created_at|date:"H:i" }}</time>
+                        {% if message.deleted_at %}
+                            <span class="chat-message__edited">Видалено</span>
+                        {% endif %}
+                    </div>
+                    <div class="chat-message__bubble">
+                        {% if message.deleted_at %}
+                            <p class="chat-message__deleted">Повідомлення видалено</p>
+                        {% else %}
+                            <p class="chat-message__text">{{ message.text }}</p>
+                        {% endif %}
+                    </div>
+                </li>
+            {% empty %}
+                <li class="chat-empty">Немає повідомлень.</li>
+            {% endfor %}
+        </ul>
+        <form id="groupChatForm" class="chat-form" method="post" action="{% url 'chat:group_message_send' group.id %}">
+            {% csrf_token %}
+            <input type="text" id="groupChatInput" name="text" placeholder="Напишіть повідомлення...">
+            <button type="submit">Надіслати</button>
+        </form>
+    </section>
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const menus = document.querySelectorAll('[data-member-menu]');
+        if (!menus.length) return;
+
+        const closeAll = () => {
+            menus.forEach((menu) => {
+                menu.classList.remove('chat-member-menu--open');
+                const toggle = menu.querySelector('.chat-member-menu__toggle');
+                if (toggle) toggle.setAttribute('aria-expanded', 'false');
+            });
+        };
+
+        menus.forEach((menu) => {
+            const toggle = menu.querySelector('.chat-member-menu__toggle');
+            if (!toggle) return;
+            toggle.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const isOpen = menu.classList.toggle('chat-member-menu--open');
+                toggle.setAttribute('aria-expanded', String(isOpen));
+                if (isOpen) {
+                    menus.forEach((other) => {
+                        if (other !== menu) {
+                            other.classList.remove('chat-member-menu--open');
+                            const otherToggle = other.querySelector('.chat-member-menu__toggle');
+                            if (otherToggle) otherToggle.setAttribute('aria-expanded', 'false');
+                        }
+                    });
+                }
+            });
+        });
+
+        document.addEventListener('click', (event) => {
+            if (!event.target.closest('[data-member-menu]')) closeAll();
+        });
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') closeAll();
+        });
+    });
+</script>
+<div id="groupContextMenu" class="chat-context-menu" hidden>
+    <button type="button" class="chat-context-menu__action" data-action="edit">Редагувати</button>
+    <button type="button" class="chat-context-menu__action" data-action="delete">Видалити</button>
+</div>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const messagesEl = document.getElementById('groupMessages');
+        const formEl = document.getElementById('groupChatForm');
+        const inputEl = document.getElementById('groupChatInput');
+        const contextMenuEl = document.getElementById('groupContextMenu');
+        if (!messagesEl || !formEl || !inputEl) return;
+
+        const groupId = "{{ group.id }}";
+        const currentUserId = Number(messagesEl.dataset.currentUserId);
+        const isAdmin = messagesEl.dataset.isAdmin === 'true';
+        const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        const socket = new WebSocket(`${scheme}://${window.location.host}/ws/chat/group/${groupId}/`);
+        const csrfToken = formEl.querySelector('[name="csrfmiddlewaretoken"]')?.value || '';
+        let editingMessageId = null;
+        let contextMessageEl = null;
+
+        const scrollToBottom = () => {
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        };
+
+        const appendMessage = (payload) => {
+            const item = document.createElement('li');
+            item.className = 'chat-message';
+            item.dataset.messageId = payload.message_id;
+            item.dataset.senderId = payload.sender_id;
+            if (payload.sender_id === currentUserId) {
+                item.classList.add('chat-message--own');
+            }
+            item.innerHTML = `
+                <div class="chat-message__meta">
+                    <span>${payload.username}</span>
+                    <time>${new Date(payload.created_at || Date.now()).toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}</time>
+                </div>
+                <div class="chat-message__bubble">
+                    <p class="chat-message__text"></p>
+                </div>
+            `;
+            const textEl = item.querySelector('.chat-message__text');
+            if (textEl) textEl.textContent = payload.message || '';
+            messagesEl.appendChild(item);
+            scrollToBottom();
+        };
+
+        const getMessageEl = (messageId) =>
+            messagesEl.querySelector(`[data-message-id="${messageId}"]`);
+
+        const setEditedIndicator = (messageEl) => {
+            const metaEl = messageEl.querySelector('.chat-message__meta');
+            if (!metaEl) return;
+            let editedEl = metaEl.querySelector('.chat-message__edited');
+            if (!editedEl) {
+                editedEl = document.createElement('span');
+                editedEl.className = 'chat-message__edited';
+                editedEl.textContent = 'Ред.';
+                metaEl.appendChild(editedEl);
+            }
+        };
+
+        const updateMessageText = (messageEl, text) => {
+            const bubbleEl = messageEl.querySelector('.chat-message__bubble');
+            if (!bubbleEl) return;
+            let textEl = bubbleEl.querySelector('.chat-message__text');
+            if (text) {
+                if (!textEl) {
+                    textEl = document.createElement('p');
+                    textEl.className = 'chat-message__text';
+                    bubbleEl.prepend(textEl);
+                }
+                textEl.textContent = text;
+            } else if (textEl) {
+                textEl.remove();
+            }
+        };
+
+        const setMessageDeleted = (messageEl) => {
+            messageEl.classList.add('chat-message--deleted');
+            const editedEl = messageEl.querySelector('.chat-message__edited');
+            if (editedEl) editedEl.remove();
+            const bubbleEl = messageEl.querySelector('.chat-message__bubble');
+            if (!bubbleEl) return;
+            bubbleEl.innerHTML = '';
+            const deletedEl = document.createElement('p');
+            deletedEl.className = 'chat-message__deleted';
+            deletedEl.textContent = 'Повідомлення видалено';
+            bubbleEl.appendChild(deletedEl);
+        };
+
+        socket.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === 'message') {
+                appendMessage(data);
+                return;
+            }
+            if (data.type === 'message_edit') {
+                const messageEl = getMessageEl(data.message_id);
+                if (!messageEl || messageEl.classList.contains('chat-message--deleted')) return;
+                updateMessageText(messageEl, data.text || '');
+                setEditedIndicator(messageEl);
+                return;
+            }
+            if (data.type === 'message_delete') {
+                const messageEl = getMessageEl(data.message_id);
+                if (!messageEl) return;
+                setMessageDeleted(messageEl);
+            }
+        };
+
+        const postJson = (url, payload) =>
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify(payload),
+                credentials: 'same-origin',
+            });
+
+        const closeContextMenu = () => {
+            if (!contextMenuEl) return;
+            contextMenuEl.hidden = true;
+            contextMessageEl = null;
+        };
+
+        const openContextMenu = (messageEl, x, y) => {
+            if (!contextMenuEl) return;
+            contextMessageEl = messageEl;
+            contextMenuEl.hidden = false;
+            const menuRect = contextMenuEl.getBoundingClientRect();
+            const maxX = window.innerWidth - menuRect.width - 8;
+            const maxY = window.innerHeight - menuRect.height - 8;
+            contextMenuEl.style.left = `${Math.min(x, Math.max(8, maxX))}px`;
+            contextMenuEl.style.top = `${Math.min(y, Math.max(8, maxY))}px`;
+            const isOwn = Number(messageEl.dataset.senderId) === currentUserId;
+            const isDeleted = messageEl.classList.contains('chat-message--deleted');
+            contextMenuEl.querySelector('[data-action="edit"]').hidden = !isOwn || isDeleted;
+            contextMenuEl.querySelector('[data-action="delete"]').hidden = (isDeleted || (!isOwn && !isAdmin));
+        };
+
+        const startEditing = (messageEl) => {
+            const textEl = messageEl.querySelector('.chat-message__text');
+            const currentText = textEl ? textEl.textContent : '';
+            editingMessageId = Number(messageEl.dataset.messageId);
+            inputEl.value = currentText;
+            inputEl.focus();
+            const submitButton = formEl.querySelector('button[type="submit"]');
+            if (submitButton) submitButton.textContent = 'Зберегти';
+        };
+
+        const clearEditing = () => {
+            editingMessageId = null;
+            const submitButton = formEl.querySelector('button[type="submit"]');
+            if (submitButton) submitButton.textContent = 'Надіслати';
+        };
+
+        messagesEl.addEventListener('contextmenu', (event) => {
+            const target = event.target instanceof HTMLElement ? event.target : null;
+            if (!target) return;
+            const messageEl = target.closest('.chat-message');
+            if (!messageEl) return;
+            event.preventDefault();
+            openContextMenu(messageEl, event.clientX, event.clientY);
+        });
+
+        document.addEventListener('pointerdown', (event) => {
+            if (!contextMenuEl || contextMenuEl.hidden) return;
+            const target = event.target instanceof HTMLElement ? event.target : null;
+            if (target && contextMenuEl.contains(target)) return;
+            closeContextMenu();
+        });
+
+        if (contextMenuEl) {
+            contextMenuEl.addEventListener('click', async (event) => {
+                const target = event.target instanceof HTMLElement ? event.target : null;
+                if (!target || !contextMessageEl) return;
+                const action = target.dataset.action;
+                if (action === 'edit') {
+                    startEditing(contextMessageEl);
+                    closeContextMenu();
+                    return;
+                }
+                if (action === 'delete') {
+                    const messageId = Number(contextMessageEl.dataset.messageId);
+                    await postJson(`/chat/groups/${groupId}/message/${messageId}/delete/`, {});
+                    closeContextMenu();
+                }
+            });
+        }
+
+        formEl.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const text = inputEl.value.trim();
+            if (!text) return;
+            if (editingMessageId) {
+                postJson(`/chat/groups/${groupId}/message/${editingMessageId}/edit/`, { text });
+                inputEl.value = '';
+                clearEditing();
+                return;
+            }
+            if (socket.readyState !== WebSocket.OPEN) {
+                formEl.submit();
+                return;
+            }
+            socket.send(JSON.stringify({ type: 'message', message: text }));
+            inputEl.value = '';
+        });
+    });
+</script>
+{% endblock %}

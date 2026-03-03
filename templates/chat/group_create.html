@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Створити групу{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/chat.css' %}">
+{% endblock %}
+
+{% block header_title %}Створити групу{% endblock %}
+
+{% block content %}
+<section class="chat-panel">
+    <div class="chat-panel__header">
+        <h2>Нова група</h2>
+    </div>
+    <form class="chat-form" method="post">
+        {% csrf_token %}
+        {{ form.name }}
+        <button type="submit">Створити</button>
+    </form>
+</section>
+{% endblock %}

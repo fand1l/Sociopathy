@@ -17,6 +17,10 @@
         <div class="chat-panel__header">
             <h2>Діалоги</h2>
             <p>Оберіть користувача, щоб почати спілкування.</p>
+            <div class="chat-switch" role="tablist" aria-label="Перемикач чатів">
+                <a class="chat-switch__button chat-switch__button--active" href="{% url 'chat:thread_list' %}" role="tab" aria-selected="true">Особисті</a>
+                <a class="chat-switch__button" href="{% url 'chat:group_list' %}" role="tab" aria-selected="false">Групи</a>
+            </div>
         </div>
         <div class="chat-thread-list">
             {% for item in thread_items %}

@@ -1,24 +1,26 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Повідомлення{% endblock %}
+{% block title %}Групи{% endblock %}
 
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'css/chat.css' %}">
 {% endblock %}
 
-{% block header_title %}Повідомлення{% endblock %}
+{% block content_class %}site__content--chat{% endblock %}
+
+{% block header_title %}Групи{% endblock %}
 
 {% block content %}
 <div class="chat-layout chat-layout--list">
     <section class="chat-panel">
         <div class="chat-panel__header">
-            <h2>Діалоги</h2>
-            <p>Оберіть користувача, щоб почати спілкування.</p>
+            <h2>Групи</h2>
+            <p>Оберіть групу, щоб відкрити спільний чат.</p>
             <div class="chat-switchbar" role="tablist" aria-label="Перемикач чатів">
                 <div class="chat-switch">
-                    <a class="chat-switch__button chat-switch__button--active" href="{% url 'chat:thread_list' %}" role="tab" aria-selected="true">Особисті</a>
-                    <a class="chat-switch__button" href="{% url 'chat:group_list' %}" role="tab" aria-selected="false">Групи</a>
+                    <a class="chat-switch__button" href="{% url 'chat:thread_list' %}" role="tab" aria-selected="false">Особисті</a>
+                    <a class="chat-switch__button chat-switch__button--active" href="{% url 'chat:group_list' %}" role="tab" aria-selected="true">Групи</a>
                 </div>
                 <div class="chat-fab" data-chat-fab>
                     <button class="chat-fab__button" type="button" aria-haspopup="true" aria-expanded="false">+</button>
@@ -34,18 +36,16 @@
             </div>
         </div>
         <div class="chat-thread-list">
-            {% for item in thread_items %}
-                <a class="chat-thread" href="{% url 'chat:chat_thread_detail' item.thread.id %}">
-                    <div class="chat-thread__avatar">{{ item.other.username|slice:":1"|upper }}</div>
+            {% for group in groups %}
+                <a class="chat-thread" href="{% url 'chat:group_detail' group.id %}">
+                    <div class="chat-thread__avatar">{{ group.name|slice:":1"|upper }}</div>
                     <div class="chat-thread__body">
-                        <div class="chat-thread__name">{{ item.other.username }}</div>
-                        <div class="chat-thread__meta">Останнє оновлення: {{ item.thread.updated_at|date:"d.m.Y H:i" }}</div>
+                        <div class="chat-thread__name">{{ group.name }}</div>
+                        <div class="chat-thread__meta">Власник: {{ group.owner.username }}</div>
                     </div>
                 </a>
             {% empty %}
-                <div class="chat-empty">
-                    Поки що немає діалогів. Перейдіть у профіль користувача, щоб написати.
-                </div>
+                <div class="chat-empty">Ви ще не додані до груп.</div>
             {% endfor %}
         </div>
     </section>
