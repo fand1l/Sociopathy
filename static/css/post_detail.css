@@ -1,6 +1,8 @@
 .post-detail {
     max-width: 720px;
     margin: 0 auto;
+    display: grid;
+    gap: 16px;
 }
 
 .post-detail__nav {
@@ -21,11 +23,11 @@
 }
 
 .comments {
-    margin-top: 26px;
     background: var(--content-bg);
     border: 1px solid var(--color-border);
     border-radius: 30px;
     padding: 22px;
+    box-shadow: 0 10px 24px var(--color-shadow-strong);
 }
 
 .comments__title {
@@ -40,6 +42,7 @@
     border-radius: 18px;
     border: 1px solid var(--color-border);
     background: var(--color-surface-2);
+    box-shadow: 0 6px 16px var(--color-shadow-strong);
 }
 
 .comment-form .modal__textarea {
@@ -92,6 +95,12 @@
     border: 1px solid var(--color-border);
     border-radius: 20px;
     padding: 16px;
+    transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.comment-card:hover {
+    transform: translateY(-1px);
+    border-color: var(--color-border-strong);
 }
 
 .comment-card__user {
@@ -147,4 +156,21 @@
 .pagination__current {
     color: var(--color-text-muted);
     font-weight: 600;
+}
+
+@media (max-width: 720px) {
+    .post-detail {
+        gap: 12px;
+    }
+
+    .comments {
+        border-radius: 22px;
+        padding: 16px;
+    }
+
+    .comment-form,
+    .comment-card {
+        border-radius: 16px;
+        padding: 12px;
+    }
 }

@@ -1,5 +1,36 @@
+import re
+
 from django.conf import settings
 from django.db import models
+
+
+SHARED_POST_PREFIX = "Поділився постом:"
+SHARED_POST_URL_RE = re.compile(r"(?P<url>(?:https?://[^\s]+)?/post/(?P<post_id>\d+)/)")
+
+
+def _extract_shared_post_data(text):
+    raw_text = (text or "").strip()
+    if not raw_text or not raw_text.startswith(SHARED_POST_PREFIX):
+        return None, ""
+
+    matched = SHARED_POST_URL_RE.search(raw_text)
+    if not matched:
+        return None, ""
+
+    post_url = matched.group("url")
+    title = raw_text[len(SHARED_POST_PREFIX) : matched.start()].strip(" \n\r\t-—")
+    return post_url, title
+
+
+def _extract_shared_post_id(text):
+    raw_text = (text or "").strip()
+    if not raw_text or not raw_text.startswith(SHARED_POST_PREFIX):
+        return None
+    matched = SHARED_POST_URL_RE.search(raw_text)
+    if not matched:
+        return None
+    post_id = matched.group("post_id")
+    return int(post_id) if post_id else None
 
 
 class ChatThread(models.Model):
@@ -118,6 +149,18 @@ class ChatGroupMessage(models.Model):
         preview = self.text.strip()
         return preview[:50] + ("..." if len(preview) > 50 else "")
 
+    @property
+    def shared_post_url(self):
+        return _extract_shared_post_data(self.text)[0]
+
+    @property
+    def shared_post_title(self):
+        return _extract_shared_post_data(self.text)[1]
+
+    @property
+    def shared_post_id(self):
+        return _extract_shared_post_id(self.text)
+
 
 class ChatMessage(models.Model):
     thread = models.ForeignKey(
@@ -165,6 +208,18 @@ class ChatMessage(models.Model):
         if self.file:
             return f"File: {self.file.name.split('/')[-1]}"
         return "Message"
+
+    @property
+    def shared_post_url(self):
+        return _extract_shared_post_data(self.text)[0]
+
+    @property
+    def shared_post_title(self):
+        return _extract_shared_post_data(self.text)[1]
+
+    @property
+    def shared_post_id(self):
+        return _extract_shared_post_id(self.text)
 
 
 class ChatReaction(models.Model):
