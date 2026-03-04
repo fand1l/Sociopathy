@@ -110,10 +110,12 @@
                     </div>
                     <div class="post-card__content">
                         {% if post.reposted_post %}
-                            <div class="post-card__repost">
-                                Репост від
-                                <a href="{% url 'accounts:profile_detail' post.reposted_post.author.username %}">
-                                    {{ post.reposted_post.author.username }}
+                            <div class="post-card__repost" aria-label="Це репост поста">
+                                <i class="bx bx-repost post-card__repost-icon" aria-hidden="true"></i>
+                                <span class="post-card__repost-label">Репост від</span>
+                                <a class="post-card__repost-author" href="{% url 'accounts:profile_detail' post.reposted_post.author.username %}">
+                                    <img src="{{ post.reposted_post.author.profile.avatar_url }}" alt="{{ post.reposted_post.author.username }}" class="post-card__repost-avatar">
+                                    <span>{{ post.reposted_post.author.username }}</span>
                                 </a>
                             </div>
                         {% endif %}

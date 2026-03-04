@@ -162,6 +162,48 @@
     white-space: pre-wrap;
 }
 
+.post-card__repost {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    margin-bottom: 12px;
+    border-radius: 999px;
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-surface-3);
+}
+
+.post-card__repost-icon {
+    font-size: 1rem;
+    color: var(--inactive-color);
+}
+
+.post-card__repost-label {
+    font-size: 0.8rem;
+    color: var(--inactive-color);
+}
+
+.post-card__repost-author {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--accent-color);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.post-card__repost-author:hover {
+    text-decoration: underline;
+}
+
+.post-card__repost-avatar {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--color-avatar-bg);
+}
+
 .post-card__image img {
     width: 100%;
     border-radius: 12px;
@@ -235,6 +277,79 @@
 
 .modal__content--compact {
     margin-top: 8%;
+}
+
+.modal__content--share {
+    margin-top: 6%;
+}
+
+.share-users {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 16px;
+    padding-right: 4px;
+}
+
+.share-user {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-4);
+    border-radius: 14px;
+    padding: 10px 12px;
+    color: var(--color-text);
+    cursor: pointer;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.share-user:hover {
+    border-color: var(--color-border-strong);
+    background: var(--color-surface-3);
+}
+
+.share-user.active {
+    border-color: var(--button-bg);
+    background: var(--color-surface-3);
+}
+
+.share-user span {
+    font-weight: 600;
+    color: var(--accent-color);
+}
+
+.share-users__empty {
+    margin: 6px 0 12px;
+    color: var(--inactive-color);
+}
+
+.share-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.share-actions form {
+    margin: 0;
+}
+
+.share-actions .modal__button {
+    width: 100%;
+    float: none;
+    top: 0;
+    position: static;
+    border-radius: 14px;
+    padding: 12px 14px;
+}
+
+.share-actions .modal__button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
 }
 
 .modal--edit .modal__footer--actions {

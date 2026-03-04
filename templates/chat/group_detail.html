@@ -103,7 +103,21 @@
                         {% if message.deleted_at %}
                             <p class="chat-message__deleted">Повідомлення видалено</p>
                         {% else %}
-                            <p class="chat-message__text">{{ message.text }}</p>
+                            {% if message.shared_post_url %}
+                                <a class="chat-message__shared-post" href="{{ message.shared_post_url }}">
+                                    {% if message.shared_post_image_url %}
+                                        <img class="chat-message__shared-image" src="{{ message.shared_post_image_url }}" alt="Прев'ю поста" loading="lazy" />
+                                    {% endif %}
+                                    <span class="chat-message__shared-label">Поділився постом</span>
+                                    {% if message.shared_post_title %}
+                                        <span class="chat-message__shared-title">{{ message.shared_post_title }}</span>
+                                    {% else %}
+                                        <span class="chat-message__shared-title">Відкрити пост</span>
+                                    {% endif %}
+                                </a>
+                            {% else %}
+                                <p class="chat-message__text">{{ message.text }}</p>
+                            {% endif %}
                         {% endif %}
                     </div>
                 </li>

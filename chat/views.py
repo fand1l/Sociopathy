@@ -17,6 +17,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 from relationships.models import Follow
+from posts.models import Post
 from .forms import (
     ChatGroupForm,
     ChatGroupMemberAddForm,
@@ -34,6 +35,36 @@ from .models import (
 )
 
 User = get_user_model()
+
+
+def _attach_shared_post_previews(messages):
+    post_ids = {
+        message.shared_post_id
+        for message in messages
+        if getattr(message, "shared_post_id", None)
+    }
+    if not post_ids:
+        return
+
+    posts_by_id = {
+        post.id: post
+        for post in Post.objects.filter(id__in=post_ids).select_related("reposted_post")
+    }
+
+    for message in messages:
+        message.shared_post_image_url = ""
+        post_id = getattr(message, "shared_post_id", None)
+        if not post_id:
+            continue
+
+        post = posts_by_id.get(post_id)
+        if not post:
+            continue
+
+        if post.reposted_post_id and post.reposted_post and post.reposted_post.image:
+            message.shared_post_image_url = post.reposted_post.image.url
+        elif post.image:
+            message.shared_post_image_url = post.image.url
 
 
 def _is_user_online(user_id):
@@ -112,6 +143,8 @@ def chat_page(request, thread_id):
     for message in chat_messages:
         message.reaction_summary = reaction_map.get(message.id, [])
         message.user_reactions = user_reaction_map.get(message.id, set())
+
+    _attach_shared_post_previews(chat_messages)
 
     threads = (
         ChatThread.objects.filter(participants=request.user)
@@ -393,7 +426,9 @@ class GroupDetailView(GroupAccessMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         group = self.get_object()
-        context["messages"] = group.messages.select_related("sender")
+        group_messages = list(group.messages.select_related("sender"))
+        _attach_shared_post_previews(group_messages)
+        context["messages"] = group_messages
         context["message_form"] = ChatGroupMessageForm()
         context["member_add_form"] = ChatGroupMemberAddForm()
         context["role_form"] = ChatGroupRoleForm()

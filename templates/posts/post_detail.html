@@ -36,10 +36,12 @@
 
         <div class="post-card__content">
             {% if post.reposted_post %}
-                <div class="post-card__repost">
-                    Репост від
-                    <a href="{% url 'accounts:profile_detail' post.reposted_post.author.username %}">
-                        {{ post.reposted_post.author.username }}
+                <div class="post-card__repost" aria-label="Це репост поста">
+                    <i class="bx bx-repost post-card__repost-icon" aria-hidden="true"></i>
+                    <span class="post-card__repost-label">Репост від</span>
+                    <a class="post-card__repost-author" href="{% url 'accounts:profile_detail' post.reposted_post.author.username %}">
+                        <img src="{{ post.reposted_post.author.profile.avatar_url }}" alt="{{ post.reposted_post.author.username }}" class="post-card__repost-avatar">
+                        <span>{{ post.reposted_post.author.username }}</span>
                     </a>
                 </div>
             {% endif %}
@@ -74,6 +76,16 @@
                     <i class="bx bx-repeat"></i>
                 </button>
             </form>
+            {% if user.is_authenticated %}
+            <button
+                type="button"
+                class="action-btn share-trigger"
+                data-group-action="{% url 'posts:post_share_group' post.pk %}"
+                data-separate-action="{% url 'posts:post_share_separate' post.pk %}"
+            >
+                <i class="bx bx-share"></i>
+            </button>
+            {% endif %}
             <form action="{% url 'bookmarks:toggle' post.pk %}" method="POST" class="bookmark-form">
                 {% csrf_token %}
                 <button type="submit" class="action-btn {% if post.is_bookmarked %}active{% endif %}">
@@ -141,4 +153,143 @@
         {% endif %}
     </section>
 </div>
+
+{% if user.is_authenticated %}
+<div id="shareModal" class="modal">
+    <div class="modal__content modal__content--share">
+        <div class="modal__header">
+            <h3>Поділитися постом</h3>
+            <span class="modal__close" id="shareModalClose"><i class="bx bx-x"></i></span>
+        </div>
+
+        <div class="share-users">
+            {% for recipient in share_recipients %}
+            <button type="button" class="share-user" data-user-id="{{ recipient.id }}">
+                <img src="{{ recipient.profile.avatar_url }}" alt="{{ recipient.username }}" class="user-avatar user-avatar--small">
+                <span>{{ recipient.username }}</span>
+            </button>
+            {% endfor %}
+            {% for group in share_groups %}
+            <button type="button" class="share-user" data-group-id="{{ group.id }}">
+                <div class="avatar-stub avatar-stub--small"></div>
+                <span>{{ group.name }}</span>
+            </button>
+            {% endfor %}
+            {% if not share_recipients and not share_groups %}
+            <p class="share-users__empty">Немає доступних користувачів або груп для надсилання.</p>
+            {% endif %}
+        </div>
+
+        <div class="share-actions">
+            <form method="POST" action="{% url 'posts:post_share_group' post.pk %}" id="shareGroupForm">
+                {% csrf_token %}
+                <input type="hidden" name="selected_user_ids" class="share-selected-users">
+                <input type="hidden" name="selected_group_ids" class="share-selected-groups">
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="modal__button share-submit" id="shareCreateGroupSubmit" disabled>
+                    Створити групу з цих користувачів
+                </button>
+            </form>
+            <form method="POST" action="{% url 'posts:post_share_separate' post.pk %}" id="shareSeparateForm">
+                {% csrf_token %}
+                <input type="hidden" name="selected_user_ids" class="share-selected-users">
+                <input type="hidden" name="selected_group_ids" class="share-selected-groups">
+                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                <button type="submit" class="modal__button share-submit" id="shareSeparateSubmit" disabled>
+                    Надіслати окремо
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if user.is_authenticated %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const shareModal = document.getElementById('shareModal');
+    if (!shareModal) {
+        return;
+    }
+
+    const shareTrigger = document.querySelector('.share-trigger');
+    const shareClose = document.getElementById('shareModalClose');
+    const shareUserButtons = shareModal.querySelectorAll('.share-user');
+    const shareHiddenInputs = shareModal.querySelectorAll('.share-selected-users');
+    const shareGroupHiddenInputs = shareModal.querySelectorAll('.share-selected-groups');
+    const shareCreateGroupSubmit = document.getElementById('shareCreateGroupSubmit');
+    const shareSeparateSubmit = document.getElementById('shareSeparateSubmit');
+    const shareGroupForm = document.getElementById('shareGroupForm');
+    const shareSeparateForm = document.getElementById('shareSeparateForm');
+    const selectedUsers = new Set();
+    const selectedGroups = new Set();
+
+    const syncShareState = () => {
+        const selectedUsersAsString = Array.from(selectedUsers).join(',');
+        const selectedGroupsAsString = Array.from(selectedGroups).join(',');
+        shareHiddenInputs.forEach((input) => {
+            input.value = selectedUsersAsString;
+        });
+        shareGroupHiddenInputs.forEach((input) => {
+            input.value = selectedGroupsAsString;
+        });
+        if (shareCreateGroupSubmit) {
+            shareCreateGroupSubmit.disabled = selectedUsers.size < 2 || selectedGroups.size > 0;
+        }
+        if (shareSeparateSubmit) shareSeparateSubmit.disabled = (selectedUsers.size + selectedGroups.size) === 0;
+    };
+
+    if (shareTrigger) {
+        shareTrigger.addEventListener('click', () => {
+            selectedUsers.clear();
+            selectedGroups.clear();
+            shareUserButtons.forEach((button) => button.classList.remove('active'));
+            shareGroupForm.action = shareTrigger.dataset.groupAction;
+            shareSeparateForm.action = shareTrigger.dataset.separateAction;
+            syncShareState();
+            shareModal.style.display = 'block';
+        });
+    }
+
+    shareUserButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            const userId = button.dataset.userId;
+            const groupId = button.dataset.groupId;
+            if (userId) {
+                if (selectedUsers.has(userId)) {
+                    selectedUsers.delete(userId);
+                    button.classList.remove('active');
+                } else {
+                    selectedUsers.add(userId);
+                    button.classList.add('active');
+                }
+            } else if (groupId) {
+                if (selectedGroups.has(groupId)) {
+                    selectedGroups.delete(groupId);
+                    button.classList.remove('active');
+                } else {
+                    selectedGroups.add(groupId);
+                    button.classList.add('active');
+                }
+            } else {
+                return;
+            }
+            syncShareState();
+        });
+    });
+
+    if (shareClose) {
+        shareClose.addEventListener('click', () => {
+            shareModal.style.display = 'none';
+        });
+    }
+
+    window.addEventListener('click', (event) => {
+        if (event.target == shareModal) {
+            shareModal.style.display = 'none';
+        }
+    });
+});
+</script>
+{% endif %}
 {% endblock %}

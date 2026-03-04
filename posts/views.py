@@ -5,7 +5,7 @@ from django.urls import reverse_lazy
 from .models import Post
 from likes.models import Like
 from bookmarks.models import Bookmark
-from django.db.models import Case, Exists, OuterRef, Value, When, IntegerField, F, Q
+from django.db.models import Case, Exists, OuterRef, Value, When, IntegerField, F, Q, Max
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
@@ -15,6 +15,9 @@ from django.conf import settings
 from accounts.models import Profile
 from django.contrib.auth import get_user_model
 from django.db import connection
+from django.contrib import messages
+
+from chat.models import ChatGroup, ChatGroupMembership, ChatGroupMessage, ChatMessage, ChatThread
 
 
 def build_comment_tree(root_comments):
@@ -105,6 +108,9 @@ class FeedView(ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.setdefault('form', PostForm())
+        if self.request.user.is_authenticated:
+            context["share_recipients"] = _get_share_recipients(self.request.user)
+            context["share_groups"] = _get_share_groups(self.request.user)
         return context
 
     def post(self, request, *args, **kwargs):
@@ -197,6 +203,12 @@ def post_detail(request, pk):
             "comment_tree": comment_tree,
             "form": form,
             "page_obj": page_obj,
+            "share_recipients": _get_share_recipients(request.user)
+            if request.user.is_authenticated
+            else [],
+            "share_groups": _get_share_groups(request.user)
+            if request.user.is_authenticated
+            else [],
         },
     )
 
@@ -228,6 +240,203 @@ def repost_post(request, pk):
 
 
 User = get_user_model()
+
+
+def _build_share_text(post):
+    post_url = reverse_lazy("posts:post_detail", kwargs={"pk": post.pk})
+    content_preview = (post.content or "").strip()
+    if len(content_preview) > 180:
+        content_preview = f"{content_preview[:177]}..."
+    if content_preview:
+        return f"Поділився постом:\n{content_preview}\n{post_url}"
+    return f"Поділився постом:\n{post_url}"
+
+
+def _parse_selected_user_ids(request):
+    raw_ids = request.POST.get("selected_user_ids", "")
+    ids = []
+    for value in raw_ids.split(","):
+        value = value.strip()
+        if value.isdigit():
+            ids.append(int(value))
+
+    unique_ids = []
+    seen = set()
+    for user_id in ids:
+        if user_id not in seen:
+            seen.add(user_id)
+            unique_ids.append(user_id)
+    return unique_ids
+
+
+def _parse_selected_group_ids(request):
+    raw_ids = request.POST.get("selected_group_ids", "")
+    ids = []
+    for value in raw_ids.split(","):
+        value = value.strip()
+        if value.isdigit():
+            ids.append(int(value))
+
+    unique_ids = []
+    seen = set()
+    for group_id in ids:
+        if group_id not in seen:
+            seen.add(group_id)
+            unique_ids.append(group_id)
+    return unique_ids
+
+
+def _get_share_recipients(user):
+    users = list(
+        User.objects.exclude(id=user.id)
+        .select_related("profile")
+        .order_by("username")
+    )
+    threads = (
+        ChatThread.objects.filter(participants=user)
+        .annotate(last_message_at=Max("messages__created_at"))
+        .prefetch_related("participants")
+        .order_by("-last_message_at", "-updated_at")
+    )
+
+    last_message_map = {}
+    for thread in threads:
+        other_user = thread.other_participant(user)
+        if not other_user:
+            continue
+        current_timestamp = last_message_map.get(other_user.id)
+        if not current_timestamp or (
+            thread.last_message_at and thread.last_message_at > current_timestamp
+        ):
+            last_message_map[other_user.id] = thread.last_message_at
+
+    users.sort(
+        key=lambda item: (
+            last_message_map.get(item.id) is None,
+            -last_message_map[item.id].timestamp()
+            if last_message_map.get(item.id)
+            else 0,
+            item.username.lower(),
+        )
+    )
+    return users
+
+
+def _get_share_groups(user):
+    return list(
+        ChatGroup.objects.filter(
+            memberships__user=user,
+            memberships__is_banned=False,
+        )
+        .distinct()
+        .order_by("-updated_at")
+    )
+
+
+@login_required
+@require_POST
+def share_post_create_group(request, pk):
+    post = get_object_or_404(Post, pk=pk)
+    selected_user_ids = _parse_selected_user_ids(request)
+    selected_group_ids = _parse_selected_group_ids(request)
+    if selected_group_ids:
+        messages.error(request, "Для створення нової групи вибирайте тільки користувачів.")
+        return redirect(request.POST.get("next") or "posts:home")
+
+    if len(selected_user_ids) < 2:
+        messages.error(request, "Виберіть щонайменше двох користувачів для створення групи.")
+        return redirect(request.POST.get("next") or "posts:home")
+
+    recipients = list(
+        User.objects.filter(id__in=selected_user_ids).exclude(id=request.user.id)
+    )
+    if len(recipients) < 2:
+        messages.error(request, "Не вдалося знайти обраних користувачів.")
+        return redirect(request.POST.get("next") or "posts:home")
+
+    group = ChatGroup.objects.create(
+        name=f"Пост від {request.user.username}",
+        owner=request.user,
+    )
+    ChatGroupMembership.objects.create(
+        group=group,
+        user=request.user,
+        role=ChatGroupMembership.Role.OWNER,
+    )
+    ChatGroupMembership.objects.bulk_create(
+        [
+            ChatGroupMembership(
+                group=group,
+                user=recipient,
+                role=ChatGroupMembership.Role.MEMBER,
+            )
+            for recipient in recipients
+        ]
+    )
+
+    ChatGroupMessage.objects.create(
+        group=group,
+        sender=request.user,
+        text=_build_share_text(post),
+    )
+    group.save(update_fields=["updated_at"])
+    messages.success(request, "Групу створено, пост надіслано.")
+    return redirect("chat:group_detail", group_id=group.id)
+
+
+@login_required
+@require_POST
+def share_post_separately(request, pk):
+    post = get_object_or_404(Post, pk=pk)
+    selected_user_ids = _parse_selected_user_ids(request)
+    selected_group_ids = _parse_selected_group_ids(request)
+    if not selected_user_ids and not selected_group_ids:
+        messages.error(request, "Виберіть хоча б одного користувача або групу.")
+        return redirect(request.POST.get("next") or "posts:home")
+
+    recipients = list(
+        User.objects.filter(id__in=selected_user_ids).exclude(id=request.user.id)
+    )
+    groups = list(
+        ChatGroup.objects.filter(
+            id__in=selected_group_ids,
+            memberships__user=request.user,
+            memberships__is_banned=False,
+        ).distinct()
+    )
+    if not recipients and not groups:
+        messages.error(request, "Не вдалося знайти обраних користувачів або групи.")
+        return redirect(request.POST.get("next") or "posts:home")
+
+    share_text = _build_share_text(post)
+    for recipient in recipients:
+        thread = (
+            ChatThread.objects.filter(participants=request.user)
+            .filter(participants=recipient)
+            .distinct()
+            .first()
+        )
+        if not thread:
+            thread = ChatThread.objects.create()
+            thread.participants.add(request.user, recipient)
+
+        ChatMessage.objects.create(
+            thread=thread,
+            sender=request.user,
+            text=share_text,
+        )
+        thread.save(update_fields=["updated_at"])
+
+    for group in groups:
+        ChatGroupMessage.objects.create(
+            group=group,
+            sender=request.user,
+            text=share_text,
+        )
+        group.save(update_fields=["updated_at"])
+
+    messages.success(request, "Пост надіслано у вибрані чати та групи.")
+    return redirect(request.POST.get("next") or "posts:home")
 
 
 def search_view(request):
