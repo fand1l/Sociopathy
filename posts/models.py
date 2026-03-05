@@ -42,6 +42,16 @@ class Post(models.Model):
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
+    ai_summary = models.TextField(
+        blank=True,
+        default='',
+    )
+
+    ai_summary_source_hash = models.CharField(
+        max_length=64,
+        blank=True,
+        default='',
+    )
 
     def update_score(self):
         likes_count = self.likes.count()

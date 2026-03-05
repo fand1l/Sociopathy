@@ -59,13 +59,26 @@
                             <span class="user-info__date">{{ post.created_at|date:"d M H:i" }}</span>
                         </div>
                     </div>
-                    
-                    {% if post.author == user %}
-                    <div class="post-card__manage">
-                        <a href="{% url 'posts:post_update' post.pk %}" class="manage-link"><i class='bx bx-edit-alt'></i></a>
-                        <a href="{% url 'posts:post_delete' post.pk %}" class="manage-link manage-link--delete"><i class='bx bx-trash'></i></a>
+
+                    <div class="post-card__tools">
+                        {% if post.summary_enabled %}
+                        <button
+                            type="button"
+                            class="action-btn post-summary-trigger"
+                            data-url="{% url 'posts:post_summary' post.pk %}"
+                            title="Згенерувати AI-підсумок"
+                        >
+                            <i class="bx bx-sparkles-alt"></i>
+                        </button>
+                        {% endif %}
+
+                        {% if post.author == user %}
+                        <div class="post-card__manage">
+                            <a href="{% url 'posts:post_update' post.pk %}" class="manage-link"><i class='bx bx-edit-alt'></i></a>
+                            <a href="{% url 'posts:post_delete' post.pk %}" class="manage-link manage-link--delete"><i class='bx bx-trash'></i></a>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% endif %}
                 </div>
 
                 <div class="post-card__content">
@@ -80,6 +93,12 @@
                         </div>
                     {% endif %}
                     <p>{% if post.reposted_post %}{{ post.reposted_post.content }}{% else %}{{ post.content }}{% endif %}</p>
+                    {% if post.summary_enabled %}
+                        <div class="post-summary" hidden>
+                            <div class="post-summary__title">AI-підсумок</div>
+                            <div class="post-summary__text"></div>
+                        </div>
+                    {% endif %}
                     {% if post.reposted_post and post.reposted_post.image %}
                         <div class="post-card__image">
                             <img src="{{ post.reposted_post.image.url }}" alt="Post image">
@@ -375,6 +394,59 @@
                     button.classList.remove('active');
                     icon.classList.remove('bxf');
                     icon.classList.add('bx');
+                }
+            });
+        });
+
+        document.querySelectorAll('.post-summary-trigger').forEach((button) => {
+            button.addEventListener('click', async () => {
+                const postCard = button.closest('.post-card');
+                if (!postCard) {
+                    return;
+                }
+
+                const summaryBox = postCard.querySelector('.post-summary');
+                const summaryText = postCard.querySelector('.post-summary__text');
+                if (!summaryBox || !summaryText) {
+                    return;
+                }
+
+                const previousText = summaryText.textContent;
+                const wasDisabled = button.disabled;
+
+                postCard.classList.remove('summary-fading');
+                void postCard.offsetWidth;
+                postCard.classList.add('summary-loading');
+                button.disabled = true;
+                summaryBox.hidden = false;
+                summaryText.textContent = 'Генерую підсумок...';
+
+                try {
+                    const response = await fetch(button.dataset.url, {
+                        method: 'GET',
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    });
+
+                    const data = await response.json();
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Не вдалося отримати підсумок.');
+                    }
+
+                    summaryText.textContent = data.summary;
+                } catch (error) {
+                    summaryText.textContent = error.message || 'Сталася помилка під час підсумовування.';
+                    if (previousText) {
+                        summaryText.textContent = `${summaryText.textContent}\n\nПопередній результат:\n${previousText}`;
+                    }
+                } finally {
+                    postCard.classList.remove('summary-loading');
+                    postCard.classList.add('summary-fading');
+                    window.setTimeout(() => {
+                        postCard.classList.remove('summary-fading');
+                    }, 800);
+                    button.disabled = wasDisabled;
                 }
             });
         });
