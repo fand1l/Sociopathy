@@ -32,6 +32,17 @@
                     <span class="user-info__date">{{ post.created_at|date:"d M H:i" }}</span>
                 </div>
             </div>
+            {% if summary_enabled %}
+            <button
+                type="button"
+                class="action-btn post-summary-trigger"
+                id="postSummaryTrigger"
+                data-url="{% url 'posts:post_summary' post.pk %}"
+                title="Згенерувати AI-підсумок"
+            >
+                <i class="bx bx-sparkles-alt"></i>
+            </button>
+            {% endif %}
         </div>
 
         <div class="post-card__content">
@@ -46,6 +57,12 @@
                 </div>
             {% endif %}
             <p>{% if post.reposted_post %}{{ post.reposted_post.content }}{% else %}{{ post.content }}{% endif %}</p>
+            {% if summary_enabled %}
+                <div id="postSummaryBox" class="post-summary" hidden>
+                    <div class="post-summary__title">AI-підсумок</div>
+                    <div id="postSummaryText" class="post-summary__text"></div>
+                </div>
+            {% endif %}
             {% if post.reposted_post and post.reposted_post.image %}
                 <div class="post-card__image">
                     <img src="{{ post.reposted_post.image.url }}" alt="Post image">
@@ -287,6 +304,61 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('click', (event) => {
         if (event.target == shareModal) {
             shareModal.style.display = 'none';
+        }
+    });
+});
+</script>
+{% endif %}
+
+{% if summary_enabled %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const trigger = document.getElementById('postSummaryTrigger');
+    const postCard = document.querySelector('.post-card');
+    const summaryBox = document.getElementById('postSummaryBox');
+    const summaryText = document.getElementById('postSummaryText');
+
+    if (!trigger || !postCard || !summaryBox || !summaryText) {
+        return;
+    }
+
+    trigger.addEventListener('click', async () => {
+        const originalText = summaryText.textContent;
+        const originalDisabledState = trigger.disabled;
+
+        postCard.classList.remove('summary-fading');
+        void postCard.offsetWidth;
+        postCard.classList.add('summary-loading');
+        trigger.disabled = true;
+        summaryBox.hidden = false;
+        summaryText.textContent = 'Генерую підсумок...';
+
+        try {
+            const response = await fetch(trigger.dataset.url, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.error || 'Не вдалося отримати підсумок.');
+            }
+
+            summaryText.textContent = data.summary;
+        } catch (error) {
+            summaryText.textContent = error.message || 'Сталася помилка під час підсумовування.';
+            if (originalText) {
+                summaryText.textContent = `${summaryText.textContent}\n\nПопередній результат:\n${originalText}`;
+            }
+        } finally {
+            postCard.classList.remove('summary-loading');
+            postCard.classList.add('summary-fading');
+            window.setTimeout(() => {
+                postCard.classList.remove('summary-fading');
+            }, 800);
+            trigger.disabled = originalDisabledState;
         }
     });
 });
