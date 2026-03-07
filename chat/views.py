@@ -10,6 +10,7 @@ from django.http import HttpResponseForbidden, JsonResponse
 from django.utils import timezone
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 from django.views import View
 from django.views.generic import CreateView, DetailView, ListView
 
@@ -32,6 +33,7 @@ from .models import (
     ChatMessage,
     ChatReaction,
     ChatThread,
+    ChatThreadNotificationSetting,
 )
 
 User = get_user_model()
@@ -78,6 +80,33 @@ def _are_friends(profile_a, profile_b):
         Follow.objects.filter(user_from=profile_a, user_to=profile_b).exists()
         and Follow.objects.filter(user_from=profile_b, user_to=profile_a).exists()
     )
+
+
+def _is_thread_notifications_muted(thread, user):
+    if not user or not user.is_authenticated:
+        return False
+    setting = ChatThreadNotificationSetting.objects.filter(
+        thread=thread,
+        user=user,
+    ).only("is_muted").first()
+    return bool(setting and setting.is_muted)
+
+
+def _get_private_notification_recipient(thread, sender):
+    recipient = thread.participants.exclude(id=sender.id).first()
+    if not recipient:
+        return None
+    if _is_thread_notifications_muted(thread, recipient):
+        return None
+    return recipient
+
+
+def _get_group_notification_recipients(group, sender):
+    return User.objects.filter(
+        chat_group_memberships__group=group,
+        chat_group_memberships__is_banned=False,
+        chat_group_memberships__is_muted_notifications=False,
+    ).exclude(id=sender.id)
 
 
 @login_required
@@ -177,9 +206,33 @@ def chat_page(request, thread_id):
         "thread_items": thread_items,
         "is_friend": is_friend,
         "is_online": is_online,
+        "thread_notifications_muted": _is_thread_notifications_muted(
+            thread,
+            request.user,
+        ),
         "form": ChatMessageForm(),
     }
     return render(request, "chat/chat_page.html", context)
+
+
+@login_required
+@require_POST
+def toggle_thread_notifications(request, thread_id):
+    thread = get_object_or_404(ChatThread, id=thread_id, participants=request.user)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        payload = {}
+
+    muted = bool(payload.get("muted"))
+    setting, _ = ChatThreadNotificationSetting.objects.get_or_create(
+        thread=thread,
+        user=request.user,
+    )
+    setting.is_muted = muted
+    setting.save(update_fields=["is_muted", "updated_at"])
+    return JsonResponse({"status": "ok", "muted": setting.is_muted})
 
 
 @login_required
@@ -235,6 +288,20 @@ def send_message(request, thread_id):
             "file_name": message.file.name.split("/")[-1] if message.file else None,
         },
     )
+
+    recipient = _get_private_notification_recipient(thread, request.user)
+    if recipient:
+        async_to_sync(channel_layer.group_send)(
+            f"notifications_{recipient.id}",
+            {
+                "type": "notify_message",
+                "scope": "thread",
+                "thread_id": thread.id,
+                "sender_id": request.user.id,
+                "sender_username": request.user.username,
+                "message": message.text or "",
+            },
+        )
 
     return JsonResponse({"status": "ok", "message_id": message.id})
 
@@ -435,10 +502,26 @@ class GroupDetailView(GroupAccessMixin, DetailView):
         context["membership"] = self.membership
         context["is_owner"] = group.is_owner(self.request.user)
         context["is_admin"] = group.is_admin(self.request.user)
+        context["group_notifications_muted"] = bool(
+            getattr(self.membership, "is_muted_notifications", False)
+        )
         context["memberships"] = group.memberships.select_related("user").order_by(
             "-role", "user__username"
         )
         return context
+
+
+class GroupNotificationMuteView(GroupAccessMixin, View):
+    def post(self, request, group_id):
+        try:
+            payload = json.loads(request.body or "{}")
+        except json.JSONDecodeError:
+            payload = {}
+
+        muted = bool(payload.get("muted"))
+        self.membership.is_muted_notifications = muted
+        self.membership.save(update_fields=["is_muted_notifications"])
+        return JsonResponse({"status": "ok", "muted": muted})
 
 
 class GroupMessageCreateView(GroupAccessMixin, View):
@@ -453,6 +536,34 @@ class GroupMessageCreateView(GroupAccessMixin, View):
         message.sender = request.user
         message.save()
         self.group.save(update_fields=["updated_at"])
+
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            f"group_{self.group.id}",
+            {
+                "type": "group_message",
+                "message": message.text,
+                "username": request.user.username,
+                "sender_id": request.user.id,
+                "message_id": message.id,
+                "created_at": message.created_at.isoformat(),
+            },
+        )
+
+        for recipient in _get_group_notification_recipients(self.group, request.user):
+            async_to_sync(channel_layer.group_send)(
+                f"notifications_{recipient.id}",
+                {
+                    "type": "notify_message",
+                    "scope": "group",
+                    "group_id": self.group.id,
+                    "group_name": self.group.name,
+                    "sender_id": request.user.id,
+                    "sender_username": request.user.username,
+                    "message": message.text,
+                },
+            )
+
         if request.headers.get("x-requested-with") == "XMLHttpRequest":
             return JsonResponse({"status": "ok", "message_id": message.id})
         return redirect("chat:group_detail", group_id=group_id)

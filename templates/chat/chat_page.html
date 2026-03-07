@@ -43,19 +43,32 @@
     </aside>
 
     {% if thread %}
-    <section class="chat-panel" data-other-user-id="{{ other_user.id }}" data-is-friend="{{ is_friend|yesno:'true,false' }}">
+    <section class="chat-panel" data-other-user-id="{{ other_user.id }}" data-is-friend="{{ is_friend|yesno:'true,false' }}" data-thread-muted="{{ thread_notifications_muted|yesno:'true,false' }}">
         <div class="chat-panel__header">
-            <div class="chat-panel__title">
-                <div class="chat-panel__avatar" data-user-id="{{ other_user.id }}" data-is-friend="{{ is_friend|yesno:'true,false' }}">
-                    <img src="{{ other_user.profile.avatar_url }}" alt="{{ other_user.username }}" />
-                    {% if is_friend %}
-                        <span class="chat-status-indicator{% if is_online %} chat-status-indicator--online{% endif %}" aria-label="Онлайн"></span>
-                    {% endif %}
+            <div class="chat-panel__header-row">
+                <div class="chat-panel__title">
+                    <div class="chat-panel__avatar" data-user-id="{{ other_user.id }}" data-is-friend="{{ is_friend|yesno:'true,false' }}">
+                        <img src="{{ other_user.profile.avatar_url }}" alt="{{ other_user.username }}" />
+                        {% if is_friend %}
+                            <span class="chat-status-indicator{% if is_online %} chat-status-indicator--online{% endif %}" aria-label="Онлайн"></span>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <h2>{{ other_user.username }}</h2>
+                        <p>Спілкування в реальному часі</p>
+                    </div>
                 </div>
-                <div>
-                    <h2>{{ other_user.username }}</h2>
-                    <p>Спілкування в реальному часі</p>
-                </div>
+                <button
+                    type="button"
+                    id="threadMuteToggle"
+                    class="chat-notify-toggle{% if thread_notifications_muted %} chat-notify-toggle--muted{% endif %}"
+                    data-url="{% url 'chat:chat_thread_mute_notifications' thread.id %}"
+                    aria-pressed="{{ thread_notifications_muted|yesno:'true,false' }}"
+                    title="{% if thread_notifications_muted %}Увімкнути сповіщення{% else %}Замутити сповіщення{% endif %}"
+                >
+                    <i class="bx {% if thread_notifications_muted %}bx-bell-slash{% else %}bx-bell{% endif %}"></i>
+                    <span>{% if thread_notifications_muted %}Замучено{% else %}Сповіщення увімкнені{% endif %}</span>
+                </button>
             </div>
             <div id="chatTyping" class="chat-typing" aria-live="polite">Користувач друкує...</div>
         </div>
@@ -161,12 +174,14 @@
         const previewEl = document.getElementById('chatAttachmentPreview');
         const panelEl = document.querySelector('.chat-panel');
         const contextMenuEl = document.getElementById('chatContextMenu');
+        const threadMuteToggle = document.getElementById('threadMuteToggle');
         if (!messagesEl || !formEl || !inputEl || !panelEl) return;
 
         const threadId = "{{ thread.id }}";
         const currentUserId = Number(messagesEl.dataset.currentUserId);
         const csrfToken = formEl.querySelector('[name="csrfmiddlewaretoken"]')?.value || '';
         const reactions = ['👍', '❤️', '😂', '😮', '😢', '😡'];
+        let isThreadMuted = panelEl.dataset.threadMuted === 'true';
         let editingMessageId = null;
         let editingHasMedia = false;
         let contextMessageEl = null;
@@ -184,6 +199,71 @@
                 indicator.classList.toggle('chat-status-indicator--online', isOnline);
             });
         };
+
+        const isGlobalNotificationsMuted = () => localStorage.getItem('site-notifications-muted') === '1';
+
+        const maybeNotifyIncoming = (payload) => {
+            if (payload.sender_id === currentUserId) return;
+            if (isThreadMuted || isGlobalNotificationsMuted()) return;
+
+            const previewText = payload.message || 'Нове повідомлення';
+
+            if (!('Notification' in window)) return;
+            if (Notification.permission === 'granted') {
+                new Notification(`Повідомлення від ${payload.username || 'користувача'}`, {
+                    body: previewText,
+                    tag: `thread-${threadId}`,
+                });
+                return;
+            }
+            if (Notification.permission === 'default') {
+                Notification.requestPermission().catch(() => {});
+            }
+        };
+
+        const applyThreadMuteUi = (muted) => {
+            if (!threadMuteToggle) return;
+            threadMuteToggle.classList.toggle('chat-notify-toggle--muted', muted);
+            threadMuteToggle.setAttribute('aria-pressed', muted ? 'true' : 'false');
+            threadMuteToggle.title = muted ? 'Увімкнути сповіщення' : 'Замутити сповіщення';
+            const icon = threadMuteToggle.querySelector('i');
+            const label = threadMuteToggle.querySelector('span');
+            if (icon) icon.className = `bx ${muted ? 'bx-bell-slash' : 'bx-bell'}`;
+            if (label) label.textContent = muted ? 'Замучено' : 'Сповіщення увімкнені';
+        };
+
+        applyThreadMuteUi(isThreadMuted);
+
+        if (threadMuteToggle) {
+            threadMuteToggle.addEventListener('click', async () => {
+                const url = threadMuteToggle.dataset.url;
+                if (!url) return;
+                const nextMuted = !isThreadMuted;
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: JSON.stringify({ muted: nextMuted }),
+                        credentials: 'same-origin',
+                    });
+                    if (!response.ok) return;
+                    const data = await response.json();
+                    isThreadMuted = Boolean(data.muted);
+                    applyThreadMuteUi(isThreadMuted);
+                } catch (_) {}
+            });
+        }
+
+        window.addEventListener('sociopathy:notifications-muted-changed', () => {
+            if (isGlobalNotificationsMuted()) return;
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission().catch(() => {});
+            }
+        });
 
         const scrollToBottom = () => {
             messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -360,6 +440,7 @@
             const data = JSON.parse(event.data);
             if (data.type === 'message') {
                 appendMessage(data);
+                maybeNotifyIncoming(data);
                 return;
             }
             if (data.type === 'typing') {

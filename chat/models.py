@@ -49,6 +49,32 @@ class ChatThread(models.Model):
         return f"ChatThread {self.id} ({', '.join(participants)})"
 
 
+class ChatThreadNotificationSetting(models.Model):
+    thread = models.ForeignKey(
+        ChatThread,
+        on_delete=models.CASCADE,
+        related_name="notification_settings",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="chat_thread_notification_settings",
+    )
+    is_muted = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["thread", "user"],
+                name="unique_chat_thread_notification_setting",
+            )
+        ]
+
+    def __str__(self):
+        return f"Thread #{self.thread_id} - User #{self.user_id} muted={self.is_muted}"
+
+
 class ChatGroup(models.Model):
     name = models.CharField(max_length=120)
     owner = models.ForeignKey(
@@ -110,6 +136,7 @@ class ChatGroupMembership(models.Model):
         choices=Role.choices,
         default=Role.MEMBER,
     )
+    is_muted_notifications = models.BooleanField(default=False)
     is_banned = models.BooleanField(default=False)
     joined_at = models.DateTimeField(auto_now_add=True)
     banned_at = models.DateTimeField(blank=True, null=True)
