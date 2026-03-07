@@ -7,7 +7,14 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.utils import timezone
 
-from .models import ChatGroup, ChatGroupMessage, ChatGroupMembership, ChatMessage, ChatThread
+from .models import (
+    ChatGroup,
+    ChatGroupMessage,
+    ChatGroupMembership,
+    ChatMessage,
+    ChatThread,
+    ChatThreadNotificationSetting,
+)
 
 User = get_user_model()
 
@@ -112,6 +119,20 @@ class ChatConsumer(AsyncWebsocketConsumer):
             },
         )
 
+        recipient_id = await self.get_private_notification_recipient_id(self.user.id)
+        if recipient_id:
+            await self.channel_layer.group_send(
+                f"notifications_{recipient_id}",
+                {
+                    "type": "notify_message",
+                    "scope": "thread",
+                    "thread_id": int(self.thread_id),
+                    "sender_id": self.user.id,
+                    "sender_username": self.user.username,
+                    "message": message.text,
+                },
+            )
+
     @database_sync_to_async
     def is_participant(self, user_id):
         return ChatThread.objects.filter(
@@ -142,6 +163,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
         if message_ids:
             messages.update(read_at=timezone.now(), read_by=reader)
         return message_ids
+
+    @database_sync_to_async
+    def get_private_notification_recipient_id(self, sender_id):
+        thread = ChatThread.objects.get(id=self.thread_id)
+        recipient = thread.participants.exclude(id=sender_id).first()
+        if not recipient:
+            return None
+        setting = ChatThreadNotificationSetting.objects.filter(
+            thread=thread,
+            user=recipient,
+            is_muted=True,
+        ).exists()
+        if setting:
+            return None
+        return recipient.id
 
     @sync_to_async
     def set_user_online(self, user_id, is_online):
@@ -297,6 +333,21 @@ class ChatGroupConsumer(AsyncWebsocketConsumer):
             },
         )
 
+        recipient_ids = await self.get_group_notification_recipient_ids(self.user.id)
+        for recipient_id in recipient_ids:
+            await self.channel_layer.group_send(
+                f"notifications_{recipient_id}",
+                {
+                    "type": "notify_message",
+                    "scope": "group",
+                    "group_id": int(self.group_id),
+                    "group_name": message.group.name,
+                    "sender_id": self.user.id,
+                    "sender_username": self.user.username,
+                    "message": message.text,
+                },
+            )
+
     @database_sync_to_async
     def is_member(self, user_id):
         return ChatGroupMembership.objects.filter(
@@ -318,6 +369,18 @@ class ChatGroupConsumer(AsyncWebsocketConsumer):
         )
         group.save(update_fields=["updated_at"])
         return message
+
+    @database_sync_to_async
+    def get_group_notification_recipient_ids(self, sender_id):
+        return list(
+            ChatGroupMembership.objects.filter(
+                group_id=self.group_id,
+                is_banned=False,
+                is_muted_notifications=False,
+            )
+            .exclude(user_id=sender_id)
+            .values_list("user_id", flat=True)
+        )
 
     async def group_message(self, event):
         await self.send(
@@ -352,6 +415,45 @@ class ChatGroupConsumer(AsyncWebsocketConsumer):
                     "type": "message_delete",
                     "message_id": event["message_id"],
                     "deleted_at": event["deleted_at"],
+                }
+            )
+        )
+
+
+class NotificationConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        user = self.scope.get("user")
+        if not user or not user.is_authenticated:
+            await self.close()
+            return
+
+        self.user = user
+        self.notifications_group_name = f"notifications_{user.id}"
+        await self.channel_layer.group_add(self.notifications_group_name, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        if hasattr(self, "notifications_group_name"):
+            await self.channel_layer.group_discard(
+                self.notifications_group_name,
+                self.channel_name,
+            )
+
+    async def receive(self, text_data):
+        return
+
+    async def notify_message(self, event):
+        await self.send(
+            text_data=json.dumps(
+                {
+                    "type": "notify_message",
+                    "scope": event.get("scope"),
+                    "thread_id": event.get("thread_id"),
+                    "group_id": event.get("group_id"),
+                    "group_name": event.get("group_name"),
+                    "sender_id": event.get("sender_id"),
+                    "sender_username": event.get("sender_username"),
+                    "message": event.get("message"),
                 }
             )
         )

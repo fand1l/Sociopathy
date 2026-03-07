@@ -339,6 +339,10 @@ html, body {
     transform: scale(1.05);
 }
 
+.sidebar-dropdown__item--active {
+    background: var(--color-surface-3);
+}
+
 .sidebar-dropdown__item--danger {
     color: var(--color-text);
 }
@@ -548,7 +552,6 @@ html, body {
 .confirm-modal__confirm.logout-confirm:hover {
     transform: scale(1.1);
 }
-
 
 body::-webkit-scrollbar {
     width: 10px;

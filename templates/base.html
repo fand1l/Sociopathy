@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="{% static 'css/base.css' %}">
     <link href="https://cdn.boxicons.com/3.0.8/fonts/basic/boxicons.min.css" rel="stylesheet">
     <link href="https://cdn.boxicons.com/3.0.8/fonts/filled/boxicons-filled.min.css" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="{% static 'assets/logo.svg' %}">
     {% block extra_head %}{% endblock %}
     <title>{% block title %}Sociopathy{% endblock %}</title>
 </head>
@@ -132,6 +133,13 @@
 
                         <div class="sidebar-dropdown__divider"></div>
 
+                        <button type="button" class="sidebar-dropdown__item notifications-toggle" aria-pressed="false">
+                            <i class="bx bx-bell"></i>
+                            <span>Сповіщення: увімкнено</span>
+                        </button>
+
+                        <div class="sidebar-dropdown__divider"></div>
+
                         <a href="{% url 'accounts:logout' %}?next={% url 'accounts:login' %}" class="sidebar-dropdown__item">
                             <i class="bx bx-refresh-cw"></i>
                             <span>Змінити обліковий запис</span>
@@ -169,6 +177,13 @@
                                 <button class="accent-dot accent-dot--orange" data-color="orange" title="Orange"></button>
                             </div>
                         </div>
+
+                        <div class="sidebar-dropdown__divider"></div>
+
+                        <button type="button" class="sidebar-dropdown__item notifications-toggle" aria-pressed="false">
+                            <i class="bx bx-bell"></i>
+                            <span>Сповіщення: увімкнено</span>
+                        </button>
 
                         <div class="sidebar-dropdown__divider"></div>
 
@@ -240,6 +255,7 @@
         const html = document.documentElement;
         const isAuthenticated = document.body.dataset.auth === '1';
         const preferencesUrl = '{% url "accounts:theme_preferences" %}';
+        const notificationMuteKey = 'site-notifications-muted';
 
         const getCookie = (name) => {
             const value = `; ${document.cookie}`;
@@ -264,6 +280,35 @@
                 body: JSON.stringify(payload),
             }).catch(() => {});
         };
+
+        const notificationToggleButtons = document.querySelectorAll('.notifications-toggle');
+
+        const isNotificationsMuted = () => localStorage.getItem(notificationMuteKey) === '1';
+
+        const applyNotificationsMuted = (muted) => {
+            localStorage.setItem(notificationMuteKey, muted ? '1' : '0');
+            notificationToggleButtons.forEach((button) => {
+                button.setAttribute('aria-pressed', muted ? 'true' : 'false');
+                button.classList.toggle('sidebar-dropdown__item--active', muted);
+                const icon = button.querySelector('i');
+                const label = button.querySelector('span');
+                if (icon) icon.className = `bx ${muted ? 'bx-bell-slash' : 'bx-bell'}`;
+                if (label) label.textContent = muted ? 'Сповіщення: вимкнено' : 'Сповіщення: увімкнено';
+            });
+            window.dispatchEvent(new CustomEvent('sociopathy:notifications-muted-changed', {
+                detail: { muted },
+            }));
+        };
+
+        notificationToggleButtons.forEach((button) => {
+            button.addEventListener('click', () => {
+                const nextMuted = !isNotificationsMuted();
+                applyNotificationsMuted(nextMuted);
+                if (!nextMuted && 'Notification' in window && Notification.permission === 'default') {
+                    Notification.requestPermission().catch(() => {});
+                }
+            });
+        });
 
         const syncThemeButtons = (theme) => {
             document.querySelectorAll('.theme-switcher__button').forEach((btn) => {
@@ -310,6 +355,48 @@
             const currentAccent = html.getAttribute('data-accent') || 'default';
             syncThemeButtons(currentTheme);
             syncAccentDots(currentAccent);
+        }
+
+        applyNotificationsMuted(isNotificationsMuted());
+
+        if (isAuthenticated) {
+            const isChatRoute = window.location.pathname.startsWith('/chat/');
+            if (!isChatRoute) {
+                const maybeShowGlobalNotification = (payload) => {
+                    if (!payload || payload.type !== 'notify_message') return;
+                    if (isNotificationsMuted()) return;
+
+                    const preview = payload.message || 'Нове повідомлення';
+                    const sender = payload.sender_username || 'Користувач';
+                    const toastTitle = payload.scope === 'group'
+                        ? `Група: ${payload.group_name || 'Чат'}`
+                        : `Повідомлення від ${sender}`;
+                    const toastBody = payload.scope === 'group'
+                        ? `${sender}: ${preview}`
+                        : preview;
+
+                    if (!('Notification' in window)) return;
+                    if (Notification.permission === 'granted') {
+                        new Notification(toastTitle, {
+                            body: toastBody,
+                            tag: payload.scope === 'group'
+                                ? `group-${payload.group_id || 'unknown'}`
+                                : `thread-${payload.thread_id || 'unknown'}`,
+                        });
+                    } else if (Notification.permission === 'default') {
+                        Notification.requestPermission().catch(() => {});
+                    }
+                };
+
+                const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+                const notificationsSocket = new WebSocket(`${scheme}://${window.location.host}/ws/notifications/`);
+                notificationsSocket.onmessage = (event) => {
+                    try {
+                        const payload = JSON.parse(event.data);
+                        maybeShowGlobalNotification(payload);
+                    } catch (_) {}
+                };
+            }
         }
     </script>
 </body>
