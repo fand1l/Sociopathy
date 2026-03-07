@@ -10,6 +10,11 @@ urlpatterns = [
     path("groups/create/", views.GroupCreateView.as_view(), name="group_create"),
     path("groups/<int:group_id>/", views.GroupDetailView.as_view(), name="group_detail"),
     path(
+        "groups/<int:group_id>/mute-notifications/",
+        views.GroupNotificationMuteView.as_view(),
+        name="group_mute_notifications",
+    ),
+    path(
         "groups/<int:group_id>/send/",
         views.GroupMessageCreateView.as_view(),
         name="group_message_send",
@@ -46,6 +51,11 @@ urlpatterns = [
     ),
     path("start/<str:username>/", views.start_private_chat, name="start_private_chat"),
     path("<int:thread_id>/", views.chat_page, name="chat_thread_detail"),
+    path(
+        "<int:thread_id>/mute-notifications/",
+        views.toggle_thread_notifications,
+        name="chat_thread_mute_notifications",
+    ),
     path("<int:thread_id>/send/", views.send_message, name="chat_thread_send"),
     path(
         "<int:thread_id>/message/<int:message_id>/edit/",

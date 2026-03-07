@@ -7,150 +7,191 @@
 
 {% block content %}
 <div class="feed-container">
-    <div class="feed__trigger" id="feedTrigger">
-        <div class="trigger__avatar">
-            {% if user.is_authenticated %}
-                <img src="{{ user.profile.avatar_url }}" alt="My Avatar" class="user-avatar">
-            {% else %}
-                <div class="avatar-stub"></div> 
-            {% endif %}
-        </div>
-        <div class="trigger__input">Що у вас на думці?</div>
-    </div>
-
-    <div id="postModal" class="modal">
-        <div class="modal__content">
-            <div class="modal__header">
-                <h3>Новий пост</h3>
-                <span class="modal__close"><i class="bx bx-x"></i></span>
-            </div>
-            <form method="POST" action="{% url 'posts:home' %}" enctype="multipart/form-data">
-                {% csrf_token %}
-                {{ form.content }}
-                
-                <div class="modal__upload">
-                    <label for="file-upload" class="custom-file-upload">
-                        <i class="bx bx-image-add"></i> Додати фото
-                    </label>
-                    {{ form.image }}
-                </div>
-
-                <div class="modal__footer">
-                    <button type="submit" class="modal__button">Опублікувати</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <div class="posts-list">
-        {% for post in posts %}
-            <article class="post-card">
-                <div class="post-card__header">
-                    <div class="post-card__user">
-                        <div class="avatar-wrapper">
-                            <a href="{% url 'accounts:profile_detail' post.author.username %}">
-                                <img src="{{ post.author.profile.avatar_url }}" alt="{{ post.author.username }}" class="user-avatar user-avatar--small">
-                            </a>
-                        </div>
-                        <div class="user-info">
-                            <a href="{% url 'accounts:profile_detail' post.author.username %}" class="user-info__name">
-                                {{ post.author.username }}
-                            </a>
-                            <span class="user-info__date">{{ post.created_at|date:"d M H:i" }}</span>
-                        </div>
-                    </div>
-
-                    <div class="post-card__tools">
-                        {% if post.summary_enabled %}
-                        <button
-                            type="button"
-                            class="action-btn post-summary-trigger"
-                            data-url="{% url 'posts:post_summary' post.pk %}"
-                            title="Згенерувати AI-підсумок"
-                        >
-                            <i class="bx bx-sparkles-alt"></i>
-                        </button>
-                        {% endif %}
-
-                        {% if post.author == user %}
-                        <div class="post-card__manage">
-                            <a href="{% url 'posts:post_update' post.pk %}" class="manage-link"><i class='bx bx-edit-alt'></i></a>
-                            <a href="{% url 'posts:post_delete' post.pk %}" class="manage-link manage-link--delete"><i class='bx bx-trash'></i></a>
-                        </div>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="post-card__content">
-                    {% if post.reposted_post %}
-                        <div class="post-card__repost" aria-label="Це репост поста">
-                            <i class="bx bx-repost post-card__repost-icon" aria-hidden="true"></i>
-                            <span class="post-card__repost-label">Репост від</span>
-                            <a class="post-card__repost-author" href="{% url 'accounts:profile_detail' post.reposted_post.author.username %}">
-                                <img src="{{ post.reposted_post.author.profile.avatar_url }}" alt="{{ post.reposted_post.author.username }}" class="post-card__repost-avatar">
-                                <span>{{ post.reposted_post.author.username }}</span>
-                            </a>
-                        </div>
-                    {% endif %}
-                    <p>{% if post.reposted_post %}{{ post.reposted_post.content }}{% else %}{{ post.content }}{% endif %}</p>
-                    {% if post.summary_enabled %}
-                        <div class="post-summary" hidden>
-                            <div class="post-summary__title">AI-підсумок</div>
-                            <div class="post-summary__text"></div>
-                        </div>
-                    {% endif %}
-                    {% if post.reposted_post and post.reposted_post.image %}
-                        <div class="post-card__image">
-                            <img src="{{ post.reposted_post.image.url }}" alt="Post image">
-                        </div>
-                    {% elif post.image %}
-                        <div class="post-card__image">
-                            <img src="{{ post.image.url }}" alt="Post image">
-                        </div>
-                    {% endif %}
-                </div>
-
-                <div class="post-card__footer">
-                    <form action="{% url 'likes:like_post' post.pk %}" method="POST" class="like-form">
-                        {% csrf_token %}
-                        <button type="submit" class="action-btn {% if post.is_liked %}active{% endif %}">
-                            <i class='{% if post.is_liked %}bxf{% else %}bx{% endif %} bx-heart'></i>
-                            <span>{{ post.likes.count }}</span>
-                        </button>
-                    </form>
-                    <a href="{% url 'posts:post_detail' post.pk %}" class="action-btn">
-                        <i class="bx bx-message-circle"></i>
-                        <span>{{ post.replies.count }}</span>
-                    </a>
-                    <form action="{% url 'posts:post_repost' post.pk %}" method="POST" class="repost-form">
-                        {% csrf_token %}
-                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                        <button type="submit" class="action-btn">
-                            <i class="bx bx-repeat"></i>
-                        </button>
-                    </form>
+    <div class="feed-layout">
+        <div class="feed-main">
+            <div class="feed__trigger" id="feedTrigger">
+                <div class="trigger__avatar">
                     {% if user.is_authenticated %}
-                    <button
-                        type="button"
-                        class="action-btn share-trigger"
-                        data-post-id="{{ post.pk }}"
-                        data-group-action="{% url 'posts:post_share_group' post.pk %}"
-                        data-separate-action="{% url 'posts:post_share_separate' post.pk %}"
-                    >
-                        <i class="bx bx-share"></i>
-                    </button>
+                        <img src="{{ user.profile.avatar_url }}" alt="My Avatar" class="user-avatar">
+                    {% else %}
+                        <div class="avatar-stub"></div>
                     {% endif %}
-                    <form action="{% url 'bookmarks:toggle' post.pk %}" method="POST" class="bookmark-form">
+                </div>
+                <div class="trigger__input">Що у вас на думці?</div>
+            </div>
+
+            <div id="postModal" class="modal">
+                <div class="modal__content">
+                    <div class="modal__header">
+                        <h3>Новий пост</h3>
+                        <span class="modal__close"><i class="bx bx-x"></i></span>
+                    </div>
+                    <form method="POST" action="{% url 'posts:home' %}" enctype="multipart/form-data">
                         {% csrf_token %}
-                        <button type="submit" class="action-btn {% if post.is_bookmarked %}active{% endif %}">
-                            <i class='{% if post.is_bookmarked %}bxf{% else %}bx{% endif %} bx-bookmark'></i>
-                        </button>
+                        {{ form.content }}
+
+                        <div class="modal__upload">
+                            <label for="file-upload" class="custom-file-upload">
+                                <i class="bx bx-image-add"></i> Додати фото
+                            </label>
+                            {{ form.image }}
+                        </div>
+
+                        <div class="modal__footer">
+                            <button type="submit" class="modal__button">Опублікувати</button>
+                        </div>
                     </form>
                 </div>
-            </article>
-        {% empty %}
-            <div class="empty-feed"><i class="bx bx-leaf-alt"></i><br><br>У стрічці поки порожньо. Будь першим!</div>
-        {% endfor %}
+            </div>
+
+            <div class="posts-list">
+                {% for post in posts %}
+                    <article class="post-card">
+                        <div class="post-card__header">
+                            <div class="post-card__user">
+                                <div class="avatar-wrapper">
+                                    <a href="{% url 'accounts:profile_detail' post.author.username %}">
+                                        <img src="{{ post.author.profile.avatar_url }}" alt="{{ post.author.username }}" class="user-avatar user-avatar--small">
+                                    </a>
+                                </div>
+                                <div class="user-info">
+                                    <a href="{% url 'accounts:profile_detail' post.author.username %}" class="user-info__name">
+                                        {{ post.author.username }}
+                                    </a>
+                                    <span class="user-info__date">{{ post.created_at|date:"d M H:i" }}</span>
+                                </div>
+                            </div>
+
+                            <div class="post-card__tools">
+                                {% if post.summary_enabled %}
+                                <button
+                                    type="button"
+                                    class="action-btn post-summary-trigger"
+                                    data-url="{% url 'posts:post_summary' post.pk %}"
+                                    title="Згенерувати AI-підсумок"
+                                >
+                                    <i class="bx bx-sparkles-alt"></i>
+                                </button>
+                                {% endif %}
+
+                                {% if post.author == user %}
+                                <div class="post-card__manage">
+                                    <a href="{% url 'posts:post_update' post.pk %}" class="manage-link"><i class='bx bx-edit-alt'></i></a>
+                                    <a href="{% url 'posts:post_delete' post.pk %}" class="manage-link manage-link--delete"><i class='bx bx-trash'></i></a>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="post-card__content">
+                            {% if post.reposted_post %}
+                                <div class="post-card__repost" aria-label="Це репост поста">
+                                    <i class="bx bx-repost post-card__repost-icon" aria-hidden="true"></i>
+                                    <span class="post-card__repost-label">Репост від</span>
+                                    <a class="post-card__repost-author" href="{% url 'accounts:profile_detail' post.reposted_post.author.username %}">
+                                        <img src="{{ post.reposted_post.author.profile.avatar_url }}" alt="{{ post.reposted_post.author.username }}" class="post-card__repost-avatar">
+                                        <span>{{ post.reposted_post.author.username }}</span>
+                                    </a>
+                                </div>
+                            {% endif %}
+                            <p>{% if post.reposted_post %}{{ post.reposted_post.content }}{% else %}{{ post.content }}{% endif %}</p>
+                            {% if post.summary_enabled %}
+                                <div class="post-summary" hidden>
+                                    <div class="post-summary__title">AI-підсумок</div>
+                                    <div class="post-summary__text"></div>
+                                </div>
+                            {% endif %}
+                            {% if post.reposted_post and post.reposted_post.image %}
+                                <div class="post-card__image">
+                                    <img src="{{ post.reposted_post.image.url }}" alt="Post image">
+                                </div>
+                            {% elif post.image %}
+                                <div class="post-card__image">
+                                    <img src="{{ post.image.url }}" alt="Post image">
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="post-card__footer">
+                            <form action="{% url 'likes:like_post' post.pk %}" method="POST" class="like-form">
+                                {% csrf_token %}
+                                <button type="submit" class="action-btn {% if post.is_liked %}active{% endif %}">
+                                    <i class='{% if post.is_liked %}bxf{% else %}bx{% endif %} bx-heart'></i>
+                                    <span>{{ post.likes.count }}</span>
+                                </button>
+                            </form>
+                            <a href="{% url 'posts:post_detail' post.pk %}" class="action-btn">
+                                <i class="bx bx-message-circle"></i>
+                                <span>{{ post.replies.count }}</span>
+                            </a>
+                            <form action="{% url 'posts:post_repost' post.pk %}" method="POST" class="repost-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                <button type="submit" class="action-btn">
+                                    <i class="bx bx-repeat"></i>
+                                </button>
+                            </form>
+                            {% if user.is_authenticated %}
+                            <button
+                                type="button"
+                                class="action-btn share-trigger"
+                                data-post-id="{{ post.pk }}"
+                                data-group-action="{% url 'posts:post_share_group' post.pk %}"
+                                data-separate-action="{% url 'posts:post_share_separate' post.pk %}"
+                            >
+                                <i class="bx bx-share"></i>
+                            </button>
+                            {% endif %}
+                            <form action="{% url 'bookmarks:toggle' post.pk %}" method="POST" class="bookmark-form">
+                                {% csrf_token %}
+                                <button type="submit" class="action-btn {% if post.is_bookmarked %}active{% endif %}">
+                                    <i class='{% if post.is_bookmarked %}bxf{% else %}bx{% endif %} bx-bookmark'></i>
+                                </button>
+                            </form>
+                        </div>
+                    </article>
+                {% empty %}
+                    <div class="empty-feed"><i class="bx bx-leaf-alt"></i><br><br>У стрічці поки порожньо. Будь першим!</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {% if user.is_authenticated %}
+        <aside class="feed-sidebar">
+            <div class="recommendations-card">
+                <h3 class="recommendations-title">Рекомендовані друзі</h3>
+                {% if friend_recommendations %}
+                    <div class="recommendations-list">
+                        {% for recommendation in friend_recommendations %}
+                        <div class="recommendation-item">
+                            <a href="{% url 'accounts:profile_detail' recommendation.profile.user.username %}" class="recommendation-user">
+                                <img src="{{ recommendation.profile.avatar_url }}" alt="{{ recommendation.profile.user.username }}" class="user-avatar user-avatar--small">
+                                <span>{{ recommendation.profile.user.username }}</span>
+                            </a>
+                            <div class="recommendation-meta">
+                                {% if recommendation.common_friends > 0 %}
+                                    <span>{{ recommendation.common_friends }} спільних друзів</span>
+                                {% elif recommendation.shared_groups > 0 %}
+                                    <span>{{ recommendation.shared_groups }} спільних груп</span>
+                                {% elif recommendation.shared_tags > 0 %}
+                                    <span>{{ recommendation.shared_tags }} спільних інтересів</span>
+                                {% else %}
+                                    <span>Може бути вам цікавий</span>
+                                {% endif %}
+                            </div>
+                            <form action="{% url 'relationships:follow_toggle' recommendation.profile.user.username %}" method="POST" class="recommendation-action">
+                                {% csrf_token %}
+                                <button type="submit" class="action-btn">Додати</button>
+                            </form>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="recommendations-empty">Поки немає рекомендацій.</p>
+                {% endif %}
+            </div>
+        </aside>
+        {% endif %}
     </div>
 
     {% if user.is_authenticated %}

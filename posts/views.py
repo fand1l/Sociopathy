@@ -6,7 +6,7 @@ from django.http import JsonResponse
 from .models import Post
 from likes.models import Like
 from bookmarks.models import Bookmark
-from django.db.models import Case, Exists, OuterRef, Value, When, IntegerField, F, Q, Max
+from django.db.models import Case, Exists, OuterRef, Value, When, IntegerField, F, Q, Max, Count
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
@@ -17,6 +17,7 @@ from accounts.models import Profile
 from django.contrib.auth import get_user_model
 from django.db import connection
 from django.contrib import messages
+from relationships.models import Follow
 import json
 import hashlib
 import re
@@ -69,6 +70,110 @@ def build_comment_tree(root_comments):
         }
 
     return [build(comment) for comment in root_comments]
+
+
+def _extract_bio_tags(text):
+    return {
+        tag.lower()
+        for tag in re.findall(r"#([\w_]{2,30})", (text or ""), flags=re.UNICODE)
+    }
+
+
+def _build_friend_recommendations(user, limit=6):
+    profile, _ = Profile.objects.get_or_create(user=user)
+
+    friend_profiles = profile.following.filter(followers=profile)
+    friend_profile_ids = set(friend_profiles.values_list("id", flat=True))
+
+    candidate_profiles = list(
+        Profile.objects.select_related("user")
+        .exclude(id=profile.id)
+        .exclude(id__in=friend_profile_ids)
+    )
+    if not candidate_profiles:
+        return []
+
+    candidate_profile_ids = {candidate.id for candidate in candidate_profiles}
+    candidate_user_ids = [candidate.user_id for candidate in candidate_profiles]
+
+    if friend_profile_ids:
+        forward_pairs = set(
+            Follow.objects.filter(
+                user_from_id__in=friend_profile_ids,
+                user_to_id__in=candidate_profile_ids,
+            ).values_list("user_from_id", "user_to_id")
+        )
+        backward_pairs = set(
+            Follow.objects.filter(
+                user_from_id__in=candidate_profile_ids,
+                user_to_id__in=friend_profile_ids,
+            ).values_list("user_from_id", "user_to_id")
+        )
+
+        mutual_friend_counts = {}
+        for friend_id, candidate_id in forward_pairs:
+            if (candidate_id, friend_id) in backward_pairs:
+                mutual_friend_counts[candidate_id] = (
+                    mutual_friend_counts.get(candidate_id, 0) + 1
+                )
+    else:
+        mutual_friend_counts = {}
+
+    user_group_ids = set(
+        ChatGroupMembership.objects.filter(user=user, is_banned=False).values_list(
+            "group_id", flat=True
+        )
+    )
+    if user_group_ids:
+        shared_group_rows = ChatGroupMembership.objects.filter(
+            user_id__in=candidate_user_ids,
+            is_banned=False,
+            group_id__in=user_group_ids,
+        ).values("user_id").annotate(shared_groups=Count("group_id", distinct=True))
+        shared_group_counts = {
+            row["user_id"]: row["shared_groups"] for row in shared_group_rows
+        }
+    else:
+        shared_group_counts = {}
+
+    user_tags = _extract_bio_tags(profile.bio)
+    post_rows = Post.objects.filter(author_id__in=candidate_user_ids).values(
+        "author_id"
+    ).annotate(total_posts=Count("id"))
+    post_counts = {row["author_id"]: row["total_posts"] for row in post_rows}
+
+    recommendations = []
+    for candidate in candidate_profiles:
+        common_friends = mutual_friend_counts.get(candidate.id, 0)
+        shared_groups = shared_group_counts.get(candidate.user_id, 0)
+        candidate_tags = _extract_bio_tags(candidate.bio)
+        shared_tags = len(user_tags & candidate_tags) if user_tags and candidate_tags else 0
+        posts_count = post_counts.get(candidate.user_id, 0)
+
+        score = (common_friends * 10) + (shared_groups * 4) + (shared_tags * 3)
+
+        recommendations.append(
+            {
+                "profile": candidate,
+                "common_friends": common_friends,
+                "shared_groups": shared_groups,
+                "shared_tags": shared_tags,
+                "score": score,
+                "posts_count": posts_count,
+            }
+        )
+
+    recommendations.sort(
+        key=lambda item: (
+            0 if item["common_friends"] > 0 else 1,
+            -item["common_friends"],
+            -item["score"],
+            -item["posts_count"],
+            item["profile"].user.username.lower(),
+        )
+    )
+
+    return recommendations[:limit]
 
 class FeedView(ListView):
     model = Post
@@ -130,6 +235,11 @@ class FeedView(ListView):
         if self.request.user.is_authenticated:
             context["share_recipients"] = _get_share_recipients(self.request.user)
             context["share_groups"] = _get_share_groups(self.request.user)
+            context["friend_recommendations"] = _build_friend_recommendations(
+                self.request.user
+            )
+        else:
+            context["friend_recommendations"] = []
         return context
 
     def post(self, request, *args, **kwargs):

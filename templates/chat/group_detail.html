@@ -82,11 +82,24 @@
         {% endif %}
     </aside>
 
-    <section class="chat-panel">
+    <section class="chat-panel" data-group-muted="{{ group_notifications_muted|yesno:'true,false' }}">
         <div class="chat-panel__header">
-            <div class="chat-panel__title">
-                <h2>{{ group.name }}</h2>
-                <p>Власник: {{ group.owner.username }}</p>
+            <div class="chat-panel__header-row">
+                <div class="chat-panel__title">
+                    <h2>{{ group.name }}</h2>
+                    <p>Власник: {{ group.owner.username }}</p>
+                </div>
+                <button
+                    type="button"
+                    id="groupMuteToggle"
+                    class="chat-notify-toggle{% if group_notifications_muted %} chat-notify-toggle--muted{% endif %}"
+                    data-url="{% url 'chat:group_mute_notifications' group.id %}"
+                    aria-pressed="{{ group_notifications_muted|yesno:'true,false' }}"
+                    title="{% if group_notifications_muted %}Увімкнути сповіщення{% else %}Замутити сповіщення{% endif %}"
+                >
+                    <i class="bx {% if group_notifications_muted %}bx-bell-slash{% else %}bx-bell{% endif %}"></i>
+                    <span>{% if group_notifications_muted %}Замучено{% else %}Сповіщення увімкнені{% endif %}</span>
+                </button>
             </div>
         </div>
         <ul id="groupMessages" class="chat-messages" data-current-user-id="{{ request.user.id }}" data-is-admin="{{ is_admin|yesno:'true,false' }}">
@@ -183,7 +196,9 @@
         const formEl = document.getElementById('groupChatForm');
         const inputEl = document.getElementById('groupChatInput');
         const contextMenuEl = document.getElementById('groupContextMenu');
-        if (!messagesEl || !formEl || !inputEl) return;
+        const panelEl = document.querySelector('.chat-panel');
+        const groupMuteToggle = document.getElementById('groupMuteToggle');
+        if (!messagesEl || !formEl || !inputEl || !panelEl) return;
 
         const groupId = "{{ group.id }}";
         const currentUserId = Number(messagesEl.dataset.currentUserId);
@@ -191,8 +206,74 @@
         const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
         const socket = new WebSocket(`${scheme}://${window.location.host}/ws/chat/group/${groupId}/`);
         const csrfToken = formEl.querySelector('[name="csrfmiddlewaretoken"]')?.value || '';
+        let isGroupMuted = panelEl.dataset.groupMuted === 'true';
         let editingMessageId = null;
         let contextMessageEl = null;
+
+        const isGlobalNotificationsMuted = () => localStorage.getItem('site-notifications-muted') === '1';
+
+        const maybeNotifyIncoming = (payload) => {
+            if (payload.sender_id === currentUserId) return;
+            if (isGroupMuted || isGlobalNotificationsMuted()) return;
+
+            const previewText = payload.message || 'Нове повідомлення в групі';
+
+            if (!('Notification' in window)) return;
+            if (Notification.permission === 'granted') {
+                new Notification(`Повідомлення у групі ${"{{ group.name|escapejs }}"}`, {
+                    body: `${payload.username || 'Користувач'}: ${previewText}`,
+                    tag: `group-${groupId}`,
+                });
+                return;
+            }
+            if (Notification.permission === 'default') {
+                Notification.requestPermission().catch(() => {});
+            }
+        };
+
+        const applyGroupMuteUi = (muted) => {
+            if (!groupMuteToggle) return;
+            groupMuteToggle.classList.toggle('chat-notify-toggle--muted', muted);
+            groupMuteToggle.setAttribute('aria-pressed', muted ? 'true' : 'false');
+            groupMuteToggle.title = muted ? 'Увімкнути сповіщення' : 'Замутити сповіщення';
+            const icon = groupMuteToggle.querySelector('i');
+            const label = groupMuteToggle.querySelector('span');
+            if (icon) icon.className = `bx ${muted ? 'bx-bell-slash' : 'bx-bell'}`;
+            if (label) label.textContent = muted ? 'Замучено' : 'Сповіщення увімкнені';
+        };
+
+        applyGroupMuteUi(isGroupMuted);
+
+        if (groupMuteToggle) {
+            groupMuteToggle.addEventListener('click', async () => {
+                const url = groupMuteToggle.dataset.url;
+                if (!url) return;
+                const nextMuted = !isGroupMuted;
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        body: JSON.stringify({ muted: nextMuted }),
+                        credentials: 'same-origin',
+                    });
+                    if (!response.ok) return;
+                    const data = await response.json();
+                    isGroupMuted = Boolean(data.muted);
+                    applyGroupMuteUi(isGroupMuted);
+                } catch (_) {}
+            });
+        }
+
+        window.addEventListener('sociopathy:notifications-muted-changed', () => {
+            if (isGlobalNotificationsMuted()) return;
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission().catch(() => {});
+            }
+        });
 
         const scrollToBottom = () => {
             messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -269,6 +350,7 @@
             const data = JSON.parse(event.data);
             if (data.type === 'message') {
                 appendMessage(data);
+                maybeNotifyIncoming(data);
                 return;
             }
             if (data.type === 'message_edit') {
