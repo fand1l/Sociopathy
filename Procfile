@@ -1,1 +1,1 @@
-web: Sociopathy.wsgi
+web: gunicorn Sociopathy.wsgi
