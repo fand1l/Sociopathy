@@ -9,13 +9,13 @@ https://docs.djangoproject.com/en/6.0/howto/deployment/asgi/
 
 import os
 
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Sociopathy.settings')
+
 from channels.auth import AuthMiddlewareStack
 from channels.routing import ProtocolTypeRouter, URLRouter
 from django.core.asgi import get_asgi_application
 
 from chat.routing import websocket_urlpatterns
-
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Sociopathy.settings')
 
 django_asgi_app = get_asgi_application()
 
