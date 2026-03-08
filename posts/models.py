@@ -4,6 +4,11 @@ from django.utils import timezone
 from django.db.models import Count, Q
 from django.db.models.functions import Length
 
+
+MAX_POST_CONTENT_LENGTH = 4000
+MAX_POST_IMAGES = 10
+MAX_POST_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
+
 class Post(models.Model):
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -75,3 +80,26 @@ class Post(models.Model):
 
     def __str__(self):
         return f"Post {self.id} by {self.author} (Score: {self.recommendation_score:.2f})"
+
+    def media_images(self):
+        images = []
+        if self.image:
+            images.append(self.image)
+        images.extend(extra.image for extra in self.extra_images.all())
+        return images[:MAX_POST_IMAGES]
+
+
+class PostImage(models.Model):
+    post = models.ForeignKey(
+        Post,
+        on_delete=models.CASCADE,
+        related_name="extra_images",
+    )
+    image = models.ImageField(upload_to='post_images')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"Image {self.id} for Post {self.post_id}"

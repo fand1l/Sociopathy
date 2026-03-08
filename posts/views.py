@@ -3,6 +3,7 @@ from django.views.generic import ListView
 from django.core.paginator import Paginator
 from django.urls import reverse_lazy
 from django.http import JsonResponse
+from django.template.loader import render_to_string
 from .models import Post
 from likes.models import Like
 from bookmarks.models import Bookmark
@@ -49,6 +50,7 @@ def build_comment_tree(root_comments):
         batch = list(
             Post.objects.filter(parent_post_id__in=pending_parent_ids)
             .select_related("author", "author__profile")
+            .prefetch_related("extra_images")
             .order_by("created_at")
         )
 
@@ -189,6 +191,9 @@ class FeedView(ListView):
             "reposted_post",
             "reposted_post__author",
             "reposted_post__author__profile",
+        ).prefetch_related(
+            "extra_images",
+            "reposted_post__extra_images",
         )
 
         if self.request.user.is_authenticated:
@@ -246,12 +251,35 @@ class FeedView(ListView):
         if not request.user.is_authenticated:
             return redirect(f"{settings.LOGIN_URL}?next={request.path}")
 
+        is_ajax_request = request.headers.get("X-Requested-With") == "XMLHttpRequest"
         form = PostForm(request.POST, request.FILES)
         if form.is_valid():
-            post = form.save(commit=False)
-            post.author = request.user
-            post.save()
+            form.instance.author = request.user
+            post = form.save()
+
+            if is_ajax_request:
+                post.is_liked = False
+                post.is_bookmarked = False
+                post.summary_enabled = _is_summary_enabled_for_post(post)
+
+                post_html = render_to_string(
+                    "posts/_post_card.html",
+                    {"post": post, "user": request.user, "request": request},
+                    request=request,
+                )
+                return JsonResponse({"ok": True, "post_html": post_html})
+
             return redirect('posts:home')
+
+        if is_ajax_request:
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "errors": form.errors.get_json_data(),
+                    "non_field_errors": form.non_field_errors(),
+                },
+                status=400,
+            )
 
         self.object_list = self.get_queryset()
         context = self.get_context_data()
@@ -284,6 +312,9 @@ def post_detail(request, pk):
         "reposted_post",
         "reposted_post__author",
         "reposted_post__author__profile",
+    ).prefetch_related(
+        "extra_images",
+        "reposted_post__extra_images",
     )
     if request.user.is_authenticated:
         post_queryset = post_queryset.annotate(
@@ -320,6 +351,7 @@ def post_detail(request, pk):
     top_level_comments = (
         Post.objects.filter(parent_post=post)
         .select_related("author", "author__profile")
+        .prefetch_related("extra_images")
         .order_by("created_at")
     )
 
