@@ -88,14 +88,22 @@ MIDDLEWARE = [
 ]
 
 # WhiteNoise configuration
+USE_MANIFEST_STATICFILES = os.getenv('USE_MANIFEST_STATICFILES', 'False') == 'True'
+
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     },
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "BACKEND": (
+            "whitenoise.storage.CompressedManifestStaticFilesStorage"
+            if USE_MANIFEST_STATICFILES
+            else "django.contrib.staticfiles.storage.StaticFilesStorage"
+        ),
     },
 }
+
+WHITENOISE_MANIFEST_STRICT = False
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -130,12 +138,15 @@ CHANNEL_LAYERS = {
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+database_url = os.getenv('DATABASE_URL', f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
+is_sqlite_database = database_url.startswith('sqlite://')
+
 DATABASES = {
     'default': dj_database_url.config(
         conn_max_age=600,
-        conn_health_checks=True,
-        ssl_require=True,
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
+        conn_health_checks=not is_sqlite_database,
+        ssl_require=not is_sqlite_database,
+        default=database_url,
     )
 }
 
@@ -164,7 +175,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'uk'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Europe/Kyiv'
 
 USE_I18N = True
 

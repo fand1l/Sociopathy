@@ -19,17 +19,28 @@
             <form method="POST" enctype="multipart/form-data">
                 {% csrf_token %}
                 {{ form.content }}
+                {% if form.content.errors %}
+                    <div class="comment-form__errors">{{ form.content.errors }}</div>
+                {% endif %}
+                {% if form.non_field_errors %}
+                    <div class="comment-form__errors">{{ form.non_field_errors }}</div>
+                {% endif %}
 
                 <div class="modal__upload">
                     <label for="file-upload" class="custom-file-upload">
                         <i class="bx bx-image-add"></i> Змінити фото
                     </label>
-                    {{ form.image }}
+                    {{ form.images }}
                 </div>
+                {% if form.images.errors %}
+                    <div class="comment-form__errors">{{ form.images.errors }}</div>
+                {% endif %}
 
-                {% if post.image %}
+                {% if post.media_images %}
                     <div class="modal__image-preview">
-                        <img src="{{ post.image.url }}" alt="Поточне фото">
+                        {% for image in post.media_images %}
+                        <img src="{{ image.url }}" alt="Поточне фото">
+                        {% endfor %}
                     </div>
                 {% endif %}
 

@@ -10,6 +10,17 @@
     box-shadow: 0 16px 50px var(--color-shadow-strong);
 }
 
+.feed-container > .posts-list {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+}
+
+.feed-container > .posts-list .post-card {
+    width: 100%;
+    box-sizing: border-box;
+}
+
 .profile__cover {
     width: 100%;
     aspect-ratio: 970 / 250;
