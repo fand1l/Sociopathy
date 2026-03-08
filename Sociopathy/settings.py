@@ -54,6 +54,10 @@ if 'WEBSITE_HOSTNAME' in os.environ:
 LOGIN_URL = "/login/"
 AUTH_USER_MODEL = 'accounts.CustomUser'
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://sociopathy-a45dfa185a37.herokuapp.com",
+]
+
 # Application definition
 
 INSTALLED_APPS = [
