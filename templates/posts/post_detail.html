@@ -46,6 +46,7 @@
         </div>
 
         <div class="post-card__content">
+            {% with displayed_post=post.reposted_post|default:post %}
             {% if post.reposted_post %}
                 <div class="post-card__repost" aria-label="Це репост поста">
                     <i class="bx bx-repost post-card__repost-icon" aria-hidden="true"></i>
@@ -56,22 +57,19 @@
                     </a>
                 </div>
             {% endif %}
-            <p>{% if post.reposted_post %}{{ post.reposted_post.content }}{% else %}{{ post.content }}{% endif %}</p>
+            <p>{{ displayed_post.content }}</p>
             {% if summary_enabled %}
                 <div id="postSummaryBox" class="post-summary" hidden>
                     <div class="post-summary__title">AI-підсумок</div>
                     <div id="postSummaryText" class="post-summary__text"></div>
                 </div>
             {% endif %}
-            {% if post.reposted_post and post.reposted_post.image %}
+            {% for image in displayed_post.media_images %}
                 <div class="post-card__image">
-                    <img src="{{ post.reposted_post.image.url }}" alt="Post image">
+                    <img src="{{ image.url }}" alt="Post image">
                 </div>
-            {% elif post.image %}
-                <div class="post-card__image">
-                    <img src="{{ post.image.url }}" alt="Post image">
-                </div>
-            {% endif %}
+            {% endfor %}
+            {% endwith %}
         </div>
 
         <div class="post-card__footer">
@@ -122,15 +120,18 @@
                     {% if form.content.errors %}
                         <div class="comment-form__errors">{{ form.content.errors }}</div>
                     {% endif %}
+                    {% if form.non_field_errors %}
+                        <div class="comment-form__errors">{{ form.non_field_errors }}</div>
+                    {% endif %}
 
                     <div class="modal__upload">
                         <label for="file-upload" class="custom-file-upload">
                             <i class="bx bx-image-add"></i> Додати фото
                         </label>
-                        {{ form.image }}
+                        {{ form.images }}
                     </div>
-                    {% if form.image.errors %}
-                        <div class="comment-form__errors">{{ form.image.errors }}</div>
+                    {% if form.images.errors %}
+                        <div class="comment-form__errors">{{ form.images.errors }}</div>
                     {% endif %}
 
                     <div class="comment-form__actions">

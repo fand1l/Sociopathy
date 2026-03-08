@@ -227,6 +227,13 @@
     </div>
     {% endif %}
 
+    <div class="image-viewer" id="imageViewerModal" aria-hidden="true">
+        <button type="button" class="image-viewer__close" id="imageViewerClose" aria-label="Закрити перегляд">
+            <i class="bx bx-x"></i>
+        </button>
+        <img src="" alt="Повнорозмірне зображення" class="image-viewer__image" id="imageViewerImage">
+    </div>
+
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             const modal = document.getElementById('logoutModal');
@@ -397,6 +404,48 @@
                     } catch (_) {}
                 };
             }
+        }
+
+        const imageViewerModal = document.getElementById('imageViewerModal');
+        const imageViewerImage = document.getElementById('imageViewerImage');
+        const imageViewerClose = document.getElementById('imageViewerClose');
+
+        if (imageViewerModal && imageViewerImage && imageViewerClose) {
+            const closeImageViewer = () => {
+                imageViewerModal.classList.remove('image-viewer--open');
+                imageViewerModal.setAttribute('aria-hidden', 'true');
+                imageViewerImage.src = '';
+            };
+
+            document.addEventListener('click', (event) => {
+                const targetImage = event.target.closest('.post-card__image img, .comment-card__image img');
+                if (!targetImage) {
+                    return;
+                }
+
+                const fullImageUrl = targetImage.currentSrc || targetImage.src;
+                if (!fullImageUrl) {
+                    return;
+                }
+
+                imageViewerImage.src = fullImageUrl;
+                imageViewerImage.alt = targetImage.alt || 'Повнорозмірне зображення';
+                imageViewerModal.classList.add('image-viewer--open');
+                imageViewerModal.setAttribute('aria-hidden', 'false');
+            });
+
+            imageViewerClose.addEventListener('click', closeImageViewer);
+            imageViewerModal.addEventListener('click', (event) => {
+                if (event.target === imageViewerModal) {
+                    closeImageViewer();
+                }
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape' && imageViewerModal.classList.contains('image-viewer--open')) {
+                    closeImageViewer();
+                }
+            });
         }
     </script>
 </body>

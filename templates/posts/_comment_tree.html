@@ -17,11 +17,11 @@
                 </div>
                 <div class="comment-card__content">
                     <p>{{ node.comment.content }}</p>
-                    {% if node.comment.image %}
+                    {% for image in node.comment.media_images %}
                         <div class="comment-card__image">
-                            <img src="{{ node.comment.image.url }}" alt="Comment image">
+                            <img src="{{ image.url }}" alt="Comment image">
                         </div>
-                    {% endif %}
+                    {% endfor %}
                 </div>
             </article>
 
