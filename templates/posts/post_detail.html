@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static user_badge %}
 {% block title %}Пост{% endblock %}
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'css/feed.css' %}">
@@ -27,7 +27,7 @@
                 </div>
                 <div class="user-info">
                     <a href="{% url 'accounts:profile_detail' post.author.username %}" class="user-info__name">
-                        {{ post.author.username }}
+                        {{ post.author|display_name }}
                     </a>
                     <span class="user-info__date">{{ post.created_at|date:"d M H:i" }}</span>
                 </div>
@@ -53,7 +53,7 @@
                     <span class="post-card__repost-label">Репост від</span>
                     <a class="post-card__repost-author" href="{% url 'accounts:profile_detail' post.reposted_post.author.username %}">
                         <img src="{{ post.reposted_post.author.profile.avatar_url }}" alt="{{ post.reposted_post.author.username }}" class="post-card__repost-avatar">
-                        <span>{{ post.reposted_post.author.username }}</span>
+                        <span>{{ post.reposted_post.author|display_name }}</span>
                     </a>
                 </div>
             {% endif %}
@@ -184,7 +184,7 @@
             {% for recipient in share_recipients %}
             <button type="button" class="share-user" data-user-id="{{ recipient.id }}">
                 <img src="{{ recipient.profile.avatar_url }}" alt="{{ recipient.username }}" class="user-avatar user-avatar--small">
-                <span>{{ recipient.username }}</span>
+                <span>{{ recipient|display_name }}</span>
             </button>
             {% endfor %}
             {% for group in share_groups %}

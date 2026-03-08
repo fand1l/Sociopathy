@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static user_badge %}
 
 {% block title %}Групи{% endblock %}
 
@@ -41,7 +41,7 @@
                     <div class="chat-thread__avatar">{{ group.name|slice:":1"|upper }}</div>
                     <div class="chat-thread__body">
                         <div class="chat-thread__name">{{ group.name }}</div>
-                        <div class="chat-thread__meta">Власник: {{ group.owner.username }}</div>
+                        <div class="chat-thread__meta">Власник: {{ group.owner|display_name }}</div>
                     </div>
                 </a>
             {% empty %}

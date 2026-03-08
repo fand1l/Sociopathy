@@ -39,6 +39,15 @@ from .models import (
 User = get_user_model()
 
 
+def _display_username(user):
+    username = getattr(user, "username", "")
+    if not username:
+        return ""
+    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+        return f"{username} ✅"
+    return username
+
+
 def _attach_shared_post_previews(messages):
     post_ids = {
         message.shared_post_id
@@ -279,7 +288,7 @@ def send_message(request, thread_id):
         {
             "type": "chat_message",
             "message": message.text or "",
-            "username": request.user.username,
+            "username": _display_username(request.user),
             "sender_id": request.user.id,
             "message_id": message.id,
             "created_at": message.created_at.isoformat(),
@@ -298,7 +307,7 @@ def send_message(request, thread_id):
                 "scope": "thread",
                 "thread_id": thread.id,
                 "sender_id": request.user.id,
-                "sender_username": request.user.username,
+                "sender_username": _display_username(request.user),
                 "message": message.text or "",
             },
         )
@@ -543,7 +552,7 @@ class GroupMessageCreateView(GroupAccessMixin, View):
             {
                 "type": "group_message",
                 "message": message.text,
-                "username": request.user.username,
+                "username": _display_username(request.user),
                 "sender_id": request.user.id,
                 "message_id": message.id,
                 "created_at": message.created_at.isoformat(),
@@ -559,7 +568,7 @@ class GroupMessageCreateView(GroupAccessMixin, View):
                     "group_id": self.group.id,
                     "group_name": self.group.name,
                     "sender_id": request.user.id,
-                    "sender_username": request.user.username,
+                    "sender_username": _display_username(request.user),
                     "message": message.text,
                 },
             )

@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static user_badge %}
 
 {% block title %}Редагування профілю{% endblock %}
 {% block extra_head %}
@@ -13,7 +13,7 @@
     <div class="profile__header">
         <img src="{{ profile.avatar_url }}" alt="Аватар" class="profile__avatar">
         <div>
-            <div class="profile__name">{{ request.user.username }}</div>
+            <div class="profile__name">{{ request.user|display_name }}</div>
             <div class="profile__meta">@{{ request.user.username }}</div>
         </div>
     </div>

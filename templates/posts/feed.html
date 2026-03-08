@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static user_badge %}
 {% block title %}Головна{% endblock %}
 {% block extra_head %}
 <link rel="stylesheet" href="{% static 'css/feed.css' %}">
@@ -72,7 +72,7 @@
                         <div class="recommendation-item">
                             <a href="{% url 'accounts:profile_detail' recommendation.profile.user.username %}" class="recommendation-user">
                                 <img src="{{ recommendation.profile.avatar_url }}" alt="{{ recommendation.profile.user.username }}" class="user-avatar user-avatar--small">
-                                <span>{{ recommendation.profile.user.username }}</span>
+                                <span>{{ recommendation.profile.user|display_name }}</span>
                             </a>
                             <div class="recommendation-meta">
                                 {% if recommendation.common_friends > 0 %}
@@ -112,7 +112,7 @@
                 {% for recipient in share_recipients %}
                 <button type="button" class="share-user" data-user-id="{{ recipient.id }}">
                     <img src="{{ recipient.profile.avatar_url }}" alt="{{ recipient.username }}" class="user-avatar user-avatar--small">
-                    <span>{{ recipient.username }}</span>
+                    <span>{{ recipient|display_name }}</span>
                 </button>
                 {% endfor %}
                 {% for group in share_groups %}

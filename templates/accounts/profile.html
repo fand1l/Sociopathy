@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static user_badge %}
 
 {% block title %}Мій профіль{% endblock %}
 {% block extra_head %}
@@ -23,7 +23,7 @@
             <img src="{{ profile.avatar_url }}" alt="Аватар" class="profile__avatar">
             <div class="profile__info">
                 <div class="profile__title-row">
-                    <h1 class="profile__name">{{ profile.user.username }}</h1>
+                    <h1 class="profile__name">{{ profile.user|display_name }}</h1>
                     
                     <div class="copy-container">
                         <input type="hidden" value="{{ request.scheme }}://{{ request.get_host }}{{ profile.get_absolute_url }}" id="myInput">
@@ -98,7 +98,7 @@
                         </div>
                         <div class="user-info">
                             <a href="{% url 'accounts:profile_detail' post.author.username %}" class="user-info__name">
-                                {{ post.author.username }}
+                                {{ post.author|display_name }}
                             </a>
                             <span class="user-info__date">{{ post.created_at|date:"d M H:i" }}</span>
                         </div>
@@ -117,7 +117,7 @@
                         <div class="post-card__repost">
                             Репост від
                             <a href="{% url 'accounts:profile_detail' post.reposted_post.author.username %}">
-                                {{ post.reposted_post.author.username }}
+                                {{ post.reposted_post.author|display_name }}
                             </a>
                         </div>
                     {% endif %}

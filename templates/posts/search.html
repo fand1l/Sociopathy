@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static user_badge %}
 
 {% block title %}Пошук{% endblock %}
 {% block extra_head %}
@@ -54,7 +54,7 @@
                         </a>
                     </div>
                     <div class="search-card__body">
-                        <a href="{{ person.profile.get_absolute_url }}" class="search-card__title">{{ person.username }}</a>
+                        <a href="{{ person.profile.get_absolute_url }}" class="search-card__title">{{ person|display_name }}</a>
                         <p class="search-card__subtitle">@{{ person.username }}</p>
                         <p class="search-card__text">
                             {% if person.profile.bio %}
@@ -99,7 +99,7 @@
                             </div>
                             <div class="user-info">
                                 <a href="{% url 'accounts:profile_detail' post.author.username %}" class="user-info__name">
-                                    {{ post.author.username }}
+                                    {{ post.author|display_name }}
                                 </a>
                                 <span class="user-info__date">{{ post.created_at|date:"d M H:i" }}</span>
                             </div>
@@ -115,7 +115,7 @@
                                 <span class="post-card__repost-label">Репост від</span>
                                 <a class="post-card__repost-author" href="{% url 'accounts:profile_detail' post.reposted_post.author.username %}">
                                     <img src="{{ post.reposted_post.author.profile.avatar_url }}" alt="{{ post.reposted_post.author.username }}" class="post-card__repost-avatar">
-                                    <span>{{ post.reposted_post.author.username }}</span>
+                                    <span>{{ post.reposted_post.author|display_name }}</span>
                                 </a>
                             </div>
                         {% endif %}

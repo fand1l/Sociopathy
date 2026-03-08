@@ -19,6 +19,15 @@ from .models import (
 User = get_user_model()
 
 
+def _display_username(user):
+    username = getattr(user, "username", "")
+    if not username:
+        return ""
+    if getattr(user, "is_superuser", False) or getattr(user, "is_staff", False):
+        return f"{username} ✅"
+    return username
+
+
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.thread_id = self.scope["url_route"]["kwargs"]["thread_id"]
@@ -109,7 +118,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             {
                 "type": "chat_message",
                 "message": message.text,
-                "username": self.user.username,
+                "username": _display_username(self.user),
                 "sender_id": self.user.id,
                 "message_id": message.id,
                 "created_at": message.created_at.isoformat(),
@@ -128,7 +137,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     "scope": "thread",
                     "thread_id": int(self.thread_id),
                     "sender_id": self.user.id,
-                    "sender_username": self.user.username,
+                    "sender_username": _display_username(self.user),
                     "message": message.text,
                 },
             )
@@ -326,7 +335,7 @@ class ChatGroupConsumer(AsyncWebsocketConsumer):
             {
                 "type": "group_message",
                 "message": message.text,
-                "username": self.user.username,
+                "username": _display_username(self.user),
                 "sender_id": self.user.id,
                 "message_id": message.id,
                 "created_at": message.created_at.isoformat(),
@@ -343,7 +352,7 @@ class ChatGroupConsumer(AsyncWebsocketConsumer):
                     "group_id": int(self.group_id),
                     "group_name": message.group.name,
                     "sender_id": self.user.id,
-                    "sender_username": self.user.username,
+                    "sender_username": _display_username(self.user),
                     "message": message.text,
                 },
             )

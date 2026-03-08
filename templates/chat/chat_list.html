@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static user_badge %}
 
 {% block title %}Повідомлення{% endblock %}
 
@@ -38,7 +38,7 @@
                 <a class="chat-thread" href="{% url 'chat:chat_thread_detail' item.thread.id %}">
                     <div class="chat-thread__avatar">{{ item.other.username|slice:":1"|upper }}</div>
                     <div class="chat-thread__body">
-                        <div class="chat-thread__name">{{ item.other.username }}</div>
+                        <div class="chat-thread__name">{{ item.other|display_name }}</div>
                         <div class="chat-thread__meta">Останнє оновлення: {{ item.thread.updated_at|date:"d.m.Y H:i" }}</div>
                     </div>
                 </a>

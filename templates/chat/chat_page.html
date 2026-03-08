@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static user_badge %}
 
 {% block title %}Чат{% endblock %}
 
@@ -32,7 +32,7 @@
                         {% endif %}
                     </div>
                     <div class="chat-thread__body">
-                        <div class="chat-thread__name">{{ item.other.username }}</div>
+                        <div class="chat-thread__name">{{ item.other|display_name }}</div>
                         <div class="chat-thread__meta">Останнє оновлення: {{ item.thread.updated_at|date:"d.m.Y H:i" }}</div>
                     </div>
                 </a>
@@ -54,7 +54,7 @@
                         {% endif %}
                     </div>
                     <div>
-                        <h2>{{ other_user.username }}</h2>
+                        <h2>{{ other_user|display_name }}</h2>
                         <p>Спілкування в реальному часі</p>
                     </div>
                 </div>
@@ -77,7 +77,7 @@
             {% for message in chat_messages %}
                 <li class="chat-message {% if message.sender_id == request.user.id %}chat-message--own{% endif %}{% if message.deleted_at %} chat-message--deleted{% endif %}" data-message-id="{{ message.id }}" data-sender-id="{{ message.sender_id }}">
                     <div class="chat-message__meta">
-                        <span>{{ message.sender.username }}</span>
+                        <span>{{ message.sender|display_name }}</span>
                         <time datetime="{{ message.created_at|date:"c" }}">{{ message.created_at|date:"H:i" }}</time>
                         {% if message.edited_at and not message.deleted_at %}
                             <span class="chat-message__edited">Ред.</span>

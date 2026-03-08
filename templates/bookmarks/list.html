@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static user_badge %}
 
 {% block title %}Закладки{% endblock %}
 {% block extra_head %}
@@ -20,7 +20,7 @@
                         </div>
                         <div class="user-info">
                             <a href="{% url 'accounts:profile_detail' post.author.username %}" class="user-info__name">
-                                {{ post.author.username }}
+                                {{ post.author|display_name }}
                             </a>
                             <span class="user-info__date">{{ post.created_at|date:"d M H:i" }}</span>
                         </div>

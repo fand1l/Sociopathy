@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static user_badge %}
 
 {% block title %}{{ group.name }}{% endblock %}
 
@@ -27,7 +27,7 @@
                 <div class="chat-thread">
                     <div class="chat-thread__avatar">{{ member.user.username|slice:":1"|upper }}</div>
                     <div class="chat-thread__body">
-                        <div class="chat-thread__name">{{ member.user.username }}</div>
+                        <div class="chat-thread__name">{{ member.user|display_name }}</div>
                         <div class="chat-thread__meta">
                             Роль: {{ member.get_role_display }}
                             {% if member.is_banned %}(бан){% endif %}
@@ -87,7 +87,7 @@
             <div class="chat-panel__header-row">
                 <div class="chat-panel__title">
                     <h2>{{ group.name }}</h2>
-                    <p>Власник: {{ group.owner.username }}</p>
+                    <p>Власник: {{ group.owner|display_name }}</p>
                 </div>
                 <button
                     type="button"
@@ -106,7 +106,7 @@
             {% for message in messages %}
                 <li class="chat-message {% if message.sender_id == request.user.id %}chat-message--own{% endif %}{% if message.deleted_at %} chat-message--deleted{% endif %}" data-message-id="{{ message.id }}" data-sender-id="{{ message.sender_id }}">
                     <div class="chat-message__meta">
-                        <span>{{ message.sender.username }}</span>
+                        <span>{{ message.sender|display_name }}</span>
                         <time datetime="{{ message.created_at|date:"c" }}">{{ message.created_at|date:"H:i" }}</time>
                         {% if message.deleted_at %}
                             <span class="chat-message__edited">Видалено</span>
