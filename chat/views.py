@@ -246,7 +246,10 @@ def toggle_thread_notifications(request, thread_id):
 
 @login_required
 def start_private_chat(request, username):
-    other_user = get_object_or_404(User, username=username)
+    other_user = User.objects.filter(username=username).first()
+    if not other_user:
+        messages.error(request, "Користувача з таким нікнеймом не знайдено.")
+        return redirect(request.META.get("HTTP_REFERER") or "chat:thread_list")
 
     if other_user == request.user:
         messages.info(request, "Ви не можете написати самому собі.")
