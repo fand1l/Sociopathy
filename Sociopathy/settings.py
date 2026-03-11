@@ -144,10 +144,12 @@ CHANNEL_LAYERS = {
 
 database_url = os.getenv('DATABASE_URL', f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
 is_sqlite_database = database_url.startswith('sqlite://')
+default_conn_max_age = 0 if not is_sqlite_database else 600
+conn_max_age = int(os.getenv('DB_CONN_MAX_AGE', str(default_conn_max_age)))
 
 DATABASES = {
     'default': dj_database_url.config(
-        conn_max_age=600,
+        conn_max_age=conn_max_age,
         conn_health_checks=not is_sqlite_database,
         ssl_require=not is_sqlite_database,
         default=database_url,

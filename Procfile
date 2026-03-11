@@ -1,1 +1,1 @@
-web: daphne -b 0.0.0.0 -p ${PORT:-8000} Sociopathy.asgi:application
+web: ASGI_THREADS=${ASGI_THREADS:-4} daphne -b 0.0.0.0 -p ${PORT:-8000} Sociopathy.asgi:application
