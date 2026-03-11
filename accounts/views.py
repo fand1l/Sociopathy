@@ -95,10 +95,16 @@ class LoginView(View):
 
 
 class LogoutView(View):
-	def get(self, request):
+	def _logout_and_redirect(self, request):
 		logout(request)
-		next_url = request.GET.get("next")
+		next_url = request.POST.get("next") or request.GET.get("next")
 		return redirect(next_url or "posts:home")
+
+	def get(self, request):
+		return self._logout_and_redirect(request)
+
+	def post(self, request):
+		return self._logout_and_redirect(request)
 
 
 class UsernameCheckView(View):
