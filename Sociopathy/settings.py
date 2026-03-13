@@ -80,6 +80,14 @@ INSTALLED_APPS = [
     'chat',
 ]
 
+USE_CLOUDINARY_STORAGE = bool(os.getenv('CLOUDINARY_URL'))
+
+if USE_CLOUDINARY_STORAGE:
+    INSTALLED_APPS += [
+        'cloudinary_storage',
+        'cloudinary',
+    ]
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -96,7 +104,11 @@ USE_MANIFEST_STATICFILES = os.getenv('USE_MANIFEST_STATICFILES', 'False') == 'Tr
 
 STORAGES = {
     "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
+        "BACKEND": (
+            "cloudinary_storage.storage.MediaCloudinaryStorage"
+            if USE_CLOUDINARY_STORAGE
+            else "django.core.files.storage.FileSystemStorage"
+        ),
     },
     "staticfiles": {
         "BACKEND": (
